@@ -8,4 +8,4 @@
 - **Deployment-specific code:** root services, FastAPI/TTS entry points, startup scripts, authentication, terminal loops, and machine-specific configuration remain application concerns.
 - **Retired legacy code:** the former `src/agents/`, `src/pipelines/`, `src/utils/`, `src/project_config.py`, and legacy interview services were removed from this repository. They were application behavior, provider construction, or filesystem-oriented support rather than canonical graph functionality.
 
-No excluded surface is imported by `src/bot0_thought_graph/`. The former VoiceAssist prototype is maintained separately; no broad migration or redesign is performed here.
+No excluded surface is imported by `src/xf_thoughtgraph/`. The former VoiceAssist prototype is maintained separately; no broad migration or redesign is performed here.

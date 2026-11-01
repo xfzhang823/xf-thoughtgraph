@@ -62,7 +62,6 @@ backend/src/prompts/deconstruct_thoughts_prompts.py
 backend/src/prompts/Hegel-im-Gesprach-prompt.py
 backend/src/thought_generator/array_of_thoughts_llama3.py
 backend/src/thought_generator/array_of_thoughts_openai.py
-C:\github\Bot0_Release1\backend\src\utils\llm_data_utils_async.py
 
 # Ignore xf sandbox, document_xf directory, input_output
 backend/sandbox_xf/
@@ -89,10 +88,6 @@ thought_generation/*_output/
 logs/
 .running_services
 examples/results/
-
-# Platform-specific accidental paths
-C:/github/
-src/C:/
 
 # Ignore __pycache__ directory
 __pycache__/

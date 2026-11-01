@@ -1,24 +1,21 @@
 [project]
-name = "bot0-thought-graph"
+name = "xf-thoughtgraph"
 version = "0.1.0"
 description = "Reusable LLM-powered complex-topic disaggregation and thought graphs"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "anthropic>=0.120.0",
-    "openai>=2.48.0",
-    "pandas>=2.2",
     "pydantic>=2.9",
-    "pylint>=4.0.8",
 ]
 
 [project.optional-dependencies]
 providers = [
-    "anthropic>=0.39",
+    "anthropic>=0.120.0",
     "python-dotenv>=1.0",
-    "openai>=1.54",
+    "openai>=2.48.0",
 ]
 dev = [
+    "pylint>=4.0.8",
     "pytest>=8.3",
     "pytest-asyncio>=1.0",
 ]
@@ -29,10 +26,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["bot0_thought_graph*"]
+include = ["xf_thoughtgraph*"]
 
 [dependency-groups]
 dev = [
+    "pylint>=4.0.8",
     "pytest>=8.3",
     "pytest-asyncio>=1.0",
 ]

@@ -18,14 +18,6 @@ Examples:
             --vertical 6 \
             --progression implementation_steps
 
-    Legacy compatibility mode:
-
-        python examples/behavior_test.py \
-                --topic "clinical research participant recruitment" \
-                --provider openai \
-                --breadth 5 \
-                --depth 2
-
     Persist the generated graph explicitly:
 
         python examples/behavior_test_adaptive.py \
@@ -52,7 +44,7 @@ import os
 from dataclasses import dataclass
 from support import FakeProvider
 
-from bot0_thought_graph import JsonRepository, ProgressionType, ThoughtGraphEngine
+from xf_thoughtgraph import JsonRepository, ProgressionType, ThoughtGraphEngine
 
 DEFAULT_TOPIC = "participant recruitment for a post-stroke gait rehabilitation study using a wearable robotic exoskeleton"
 DEFAULT_PROVIDER = "openai"
@@ -69,8 +61,6 @@ class RuntimeConfig:
     exploration: str | None
     horizontal: int | None
     vertical: int | None
-    depth: int | None
-    breadth: int | None
     progression_type: ProgressionType
     insert_directory: str | None
     insert_key: str
@@ -131,18 +121,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit mode: maximum generated child levels beneath the root.",
     )
     parser.add_argument(
-        "--depth",
-        type=int,
-        default=None,
-        help="Legacy compatibility mode: graph depth.",
-    )
-    parser.add_argument(
-        "--breadth",
-        type=int,
-        default=None,
-        help="Legacy compatibility mode: breadth retained per expanded node.",
-    )
-    parser.add_argument(
         "--progression",
         default=_env_default("BEHAVIOR_TEST_PROGRESSION", DEFAULT_PROGRESSION.value),
         choices=[item.value for item in ProgressionType],
@@ -170,24 +148,12 @@ def resolve_config(argv: list[str] | None = None) -> RuntimeConfig:
     args = parser.parse_args(argv)
 
     has_explicit = args.horizontal is not None or args.vertical is not None
-    has_legacy = args.breadth is not None or args.depth is not None
-
-    if has_explicit and has_legacy:
-        parser.error("Do not mix horizontal/vertical with legacy breadth/depth.")
-
     if has_explicit:
         if args.exploration is not None:
             parser.error("Do not mix --exploration with --horizontal/--vertical.")
         if args.horizontal is None or args.vertical is None:
             parser.error("Explicit mode requires both --horizontal and --vertical.")
         mode = "explicit"
-        exploration = None
-    elif has_legacy:
-        if args.exploration is not None:
-            parser.error("Do not mix --exploration with --breadth/--depth.")
-        if args.breadth is None or args.depth is None:
-            parser.error("Legacy mode requires both --breadth and --depth.")
-        mode = "legacy"
         exploration = None
     else:
         mode = "adaptive"
@@ -201,8 +167,6 @@ def resolve_config(argv: list[str] | None = None) -> RuntimeConfig:
         exploration=exploration,
         horizontal=args.horizontal,
         vertical=args.vertical,
-        depth=args.depth,
-        breadth=args.breadth,
         progression_type=ProgressionType(args.progression),
         insert_directory=args.insert_directory,
         insert_key=args.insert_key,
@@ -210,25 +174,18 @@ def resolve_config(argv: list[str] | None = None) -> RuntimeConfig:
 
 
 def _fake_response_sequence(config: RuntimeConfig) -> list[str]:
-    """Build deterministic fake responses for explicit/legacy smoke testing."""
+    """Build deterministic fake responses for explicit-mode smoke testing."""
     if config.mode == "adaptive":
         raise ValueError(
             "Use a real provider to behavior-test adaptive exploration; "
-            "the fake provider is reserved for explicit/legacy smoke tests."
+            "the fake provider is reserved for explicit smoke tests."
         )
 
-    if config.mode == "explicit":
-        assert config.horizontal is not None
-        assert config.vertical is not None
-        root_count = config.horizontal
-        depth = config.vertical
-        vertical_children = 7
-    else:
-        assert config.breadth is not None
-        assert config.depth is not None
-        root_count = config.breadth
-        depth = config.depth
-        vertical_children = config.breadth
+    assert config.horizontal is not None
+    assert config.vertical is not None
+    root_count = config.horizontal
+    depth = config.vertical
+    vertical_children = 7
 
     horizontal = {
         "idea": config.topic,
@@ -281,9 +238,6 @@ def print_header(config: RuntimeConfig, resolved_model: str) -> None:
     elif config.mode == "explicit":
         print(f"Horizontal:   {config.horizontal}")
         print(f"Vertical:     {config.vertical}")
-    else:
-        print(f"Depth:        {config.depth}")
-        print(f"Breadth:      {config.breadth}")
     print(f"Progression:  {config.progression_type.value}")
     print()
 
@@ -379,12 +333,6 @@ def main(argv: list[str] | None = None) -> None:
             **common,
             horizontal=config.horizontal,
             vertical=config.vertical,
-        )
-    else:
-        graph = engine.generate_thought_graph(
-            **common,
-            depth=config.depth,
-            breadth=config.breadth,
         )
 
     print_header(config, engine.model)

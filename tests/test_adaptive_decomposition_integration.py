@@ -4,8 +4,8 @@ import re
 
 import pytest
 
-from bot0_thought_graph import ThoughtGraphEngine
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult
+from xf_thoughtgraph import ThoughtGraphEngine
+from xf_thoughtgraph.providers import GenerationRequest, GenerationResult
 
 
 def horizontal_response(*names):

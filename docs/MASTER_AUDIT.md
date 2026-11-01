@@ -1,5 +1,10 @@
 # Master Audit — bot0-thought-graph
 
+> Historical audit record. References to `bot0-thought-graph` and
+> `bot0_thought_graph` below describe the repository state at the time of the
+> audit and are intentionally preserved. The current project identity is
+> `XF ThoughtGraph` / `xf-thoughtgraph` / `xf_thoughtgraph`.
+
 ## Executive Summary
 
 `bot0-thought-graph` is a standalone reusable package at version v0.1.0 using a `src/` layout (`src/bot0_thought_graph/`). The package contains the reusable deterministic models and prompts, provider-neutral contracts and lazy SDK adapters, optional storage, the thought-generation engine, the headless interview engine, and thin orchestration. Legacy `agents`, `pipelines`, `utils`, `project_config`, `input_output`, frontend, VoiceAssist, FastAPI, and terminal code remain outside the package boundary.

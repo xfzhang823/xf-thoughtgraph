@@ -178,15 +178,15 @@ from bot0_thought_graph import ProgressionType, ThoughtGraphEngine
 
 engine.generate_thought_graph(
     topic="clinical research participant recruitment",
-    depth=2,
-    breadth=5,
+    horizontal=5,
+    vertical=2,
     progression_type=ProgressionType.PREREQUISITE_DEPENDENCY,
 )
 
 engine.generate_thought_graph(
     topic="clinical research participant recruitment",
-    depth=2,
-    breadth=5,
+    horizontal=5,
+    vertical=2,
     progression_type="prerequisite_dependency",
 )
 ```
@@ -200,8 +200,8 @@ The canonical façade shape is:
 ```python
 graph = engine.generate_thought_graph(
     topic="clinical research participant recruitment",
-    depth=3,
-    breadth=5,
+    horizontal=5,
+    vertical=3,
     progression_type=ProgressionType.IMPLEMENTATION_STEPS,
 )
 ```

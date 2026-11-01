@@ -1,23 +1,10 @@
-import pytest
-from pydantic import ValidationError
-
-from bot0_thought_graph.models import (
-    EvaluationCriteria,
+from xf_thoughtgraph.models import (
     IdeaJSONModel,
     IndexedIdeaJSONModel,
     IndexedSubThoughtJSONModel,
     IndexedThoughtJSONModel,
-    QuestionAnswerPair,
-    TextResponse,
 )
-from bot0_thought_graph.prompts import (
-    FOLLOWUP_QUESTION_GENERATION_PROMPT,
-    QUESTION_ANSWER_EVAL_PROMPT,
-    THOUGHT_GENERATION_PROMPT,
-)
-
-def test_package_models_are_public():
-    assert TextResponse(content="hello").model_dump() == {"content": "hello"}
+from xf_thoughtgraph.prompts import THOUGHT_GENERATION_PROMPT
 
 
 def test_thought_model_defaults_and_serialization():
@@ -46,32 +33,7 @@ def test_indexed_thought_hierarchy_is_validated():
     assert model.thoughts[0].sub_thoughts[0].sub_thought_index == 0
 
 
-def test_evaluation_validation_and_question_answer_defaults():
-    valid = {
-        "criteria": {
-            "relevance": 4,
-            "correctness": 4,
-            "specificity": 3,
-            "clarity": 5,
-        },
-        "explanations": {
-            "relevance": "Relevant.",
-            "correctness": "Correct.",
-            "specificity": "Specific.",
-            "clarity": "Clear.",
-        },
-        "total_score": 4.0,
-    }
-    assert EvaluationCriteria(**valid).total_score == 4.0
-    with pytest.raises(ValidationError):
-        EvaluationCriteria(**{**valid, "criteria": {"relevance": 6}})
-    with pytest.raises(ValidationError):
-        QuestionAnswerPair(question="", answer="answer")
-
-
 def test_prompt_exports_and_rendering():
     rendered = THOUGHT_GENERATION_PROMPT.format(idea="AI", num_sub_thoughts=3)
     assert '"idea": "AI"' in rendered
     assert "{num_sub_thoughts}" not in rendered
-    assert "{question}" in QUESTION_ANSWER_EVAL_PROMPT
-    assert "{conversation_context}" in FOLLOWUP_QUESTION_GENERATION_PROMPT

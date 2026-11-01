@@ -6,12 +6,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "src" / "bot0_thought_graph"
+PACKAGE = ROOT / "src" / "xf_thoughtgraph"
 
 
 def test_public_top_level_api_is_small_and_importable():
     namespace = {}
-    exec("from bot0_thought_graph import *", namespace)
+    exec("from xf_thoughtgraph import *", namespace)
     assert {
         "generate_thought_graph",
         "ThoughtGraphEngine",
@@ -42,10 +42,10 @@ def test_import_works_outside_repository_without_sdk_adapter_imports(tmp_path):
         [
             sys.executable,
             "-c",
-            "import sys; import bot0_thought_graph; "
-            "assert hasattr(bot0_thought_graph, 'generate_thought_graph'); "
-            "assert 'bot0_thought_graph.interview' not in sys.modules; "
-            "import bot0_thought_graph.providers; print('ok')",
+            "import sys; import xf_thoughtgraph; "
+            "assert hasattr(xf_thoughtgraph, 'generate_thought_graph'); "
+            "assert 'xf_thoughtgraph.interview' not in sys.modules; "
+            "import xf_thoughtgraph.providers; print('ok')",
         ],
         cwd=tmp_path,
         env=env,
@@ -60,10 +60,10 @@ def test_provider_package_does_not_construct_or_import_adapters_at_import_time(t
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     code = (
-        "import sys; import bot0_thought_graph.providers; "
-        "assert 'bot0_thought_graph.providers.openai' not in sys.modules; "
-        "assert 'bot0_thought_graph.providers.anthropic' not in sys.modules; "
-        "assert 'bot0_thought_graph.providers.gemini' not in sys.modules; "
-        "assert 'bot0_thought_graph.providers.deepseek' not in sys.modules"
+        "import sys; import xf_thoughtgraph.providers; "
+        "assert 'xf_thoughtgraph.providers.openai' not in sys.modules; "
+        "assert 'xf_thoughtgraph.providers.anthropic' not in sys.modules; "
+        "assert 'xf_thoughtgraph.providers.gemini' not in sys.modules; "
+        "assert 'xf_thoughtgraph.providers.deepseek' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=env, check=True)

@@ -6,8 +6,8 @@ Example:
         --topic "clinical research participant recruitment" \
         --provider deepseek \
         --model deepseek-v4-flash \
-        --depth 2 \
-        --breadth 5 \
+        --vertical 2 \
+        --horizontal 5 \
         --progression implementation_steps
     ```
 
@@ -24,14 +24,14 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from bot0_thought_graph import ProgressionType, ThoughtGraphEngine
-from bot0_thought_graph.providers import (
+from xf_thoughtgraph import ProgressionType, ThoughtGraphEngine
+from xf_thoughtgraph.providers import (
     GenerationRequest,
     GenerationResult,
     create_provider,
     default_model,
 )
-from bot0_thought_graph.thought_generation.parsing import extract_json
+from xf_thoughtgraph.thought_generation.parsing import extract_json
 
 try:
     from .support import FakeProvider
@@ -40,8 +40,8 @@ except ImportError:  # pragma: no cover - direct script execution
 
 DEFAULT_TOPIC = "clinical research participant recruitment"
 DEFAULT_PROVIDER = "openai"
-DEFAULT_DEPTH = 2
-DEFAULT_BREADTH = 5
+DEFAULT_VERTICAL = 2
+DEFAULT_HORIZONTAL = 5
 DEFAULT_PROGRESSION = ProgressionType.IMPLEMENTATION_STEPS
 
 
@@ -50,8 +50,8 @@ class RuntimeConfig:
     topic: str
     provider: str
     model: str | None
-    depth: int
-    breadth: int
+    vertical: int
+    horizontal: int
     progression_type: ProgressionType
     exploration: str | None
     output: str | None
@@ -143,16 +143,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--depth",
+        "--vertical",
         type=int,
-        default=int(_env_default("BEHAVIOR_TEST_DEPTH", str(DEFAULT_DEPTH))),
-        help="Number of vertical expansion levels to generate.",
+        default=int(_env_default("BEHAVIOR_TEST_VERTICAL", str(DEFAULT_VERTICAL))),
+        help="Maximum generated child levels beneath the root.",
     )
     parser.add_argument(
-        "--breadth",
+        "--horizontal",
         type=int,
-        default=int(_env_default("BEHAVIOR_TEST_BREADTH", str(DEFAULT_BREADTH))),
-        help="Number of children retained per expanded node.",
+        default=int(_env_default("BEHAVIOR_TEST_HORIZONTAL", str(DEFAULT_HORIZONTAL))),
+        help="Maximum root-level peer directions retained.",
     )
     parser.add_argument(
         "--progression",
@@ -180,15 +180,15 @@ def resolve_config(argv: list[str] | None = None) -> RuntimeConfig:
         topic=args.topic,
         provider=args.provider,
         model=args.model,
-        depth=args.depth,
-        breadth=args.breadth,
+        vertical=args.vertical,
+        horizontal=args.horizontal,
         progression_type=ProgressionType(args.progression),
         exploration=args.exploration,
         output=args.output,
     )
 
 
-def _fake_response_sequence(topic: str, depth: int, breadth: int) -> list[str]:
+def _fake_response_sequence(topic: str, vertical: int, horizontal: int) -> list[str]:
     horizontal = {
         "idea": topic,
         "thoughts": [
@@ -196,7 +196,7 @@ def _fake_response_sequence(topic: str, depth: int, breadth: int) -> list[str]:
                 "thought": f"subtopic-{index + 1}",
                 "description": f"Auto-generated subtopic {index + 1}",
             }
-            for index in range(breadth)
+            for index in range(horizontal)
         ],
     }
     vertical = {
@@ -207,21 +207,21 @@ def _fake_response_sequence(topic: str, depth: int, breadth: int) -> list[str]:
                 "name": f"detail-{index + 1}",
                 "description": f"Auto-generated detail {index + 1}",
             }
-            for index in range(breadth)
+            for index in range(7)
         ],
     }
     vertical_calls = 0
-    nodes_at_level = breadth
-    for _ in range(1, depth):
+    nodes_at_level = horizontal
+    for _ in range(1, vertical):
         vertical_calls += nodes_at_level
-        nodes_at_level *= breadth
+        nodes_at_level *= 7
     return [json.dumps(horizontal)] + [json.dumps(vertical)] * vertical_calls
 
 
 def build_provider(config: RuntimeConfig):
     if config.provider == "fake":
         return FakeProvider(
-            _fake_response_sequence(config.topic, config.depth, config.breadth)
+            _fake_response_sequence(config.topic, config.vertical, config.horizontal)
         )
     return create_provider(config.provider)
 
@@ -236,8 +236,8 @@ def print_header(config: RuntimeConfig, resolved_model: str) -> None:
     if config.exploration:
         print(f"Exploration:  {config.exploration}")
     else:
-        print(f"Depth:        {config.depth}")
-        print(f"Breadth:      {config.breadth}")
+        print(f"Vertical:     {config.vertical}")
+        print(f"Horizontal:   {config.horizontal}")
     print(f"Progression:  {config.progression_type.value}")
     print()
 
@@ -288,8 +288,8 @@ def main(argv: list[str] | None = None) -> None:
     else:
         graph = engine.generate_thought_graph(
             topic=config.topic,
-            depth=config.depth,
-            breadth=config.breadth,
+            vertical=config.vertical,
+            horizontal=config.horizontal,
             progression_type=config.progression_type,
         )
 

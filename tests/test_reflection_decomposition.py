@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 
-from bot0_thought_graph.reflection import (
+from xf_thoughtgraph.reflection import (
     DecompositionCandidate,
     DecompositionEvaluationRequest,
     DecompositionEvaluationService,
 )
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult, ProviderResponseError
+from xf_thoughtgraph.providers import GenerationRequest, GenerationResult, ProviderResponseError
 
 
 @dataclass

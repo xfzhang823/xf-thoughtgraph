@@ -2,10 +2,10 @@ from dataclasses import dataclass
 
 import pytest
 
-from bot0_thought_graph.models import IdeaJSONModel, ProgressionType
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult, ProviderRequestError
-from bot0_thought_graph.storage import JsonRepository, MemoryRepository
-from bot0_thought_graph.thought_generation import (
+from xf_thoughtgraph.models import IdeaJSONModel, ProgressionType
+from xf_thoughtgraph.providers import GenerationRequest, GenerationResult, ProviderRequestError
+from xf_thoughtgraph.storage import JsonRepository, MemoryRepository
+from xf_thoughtgraph.thought_generation import (
     HorizontalGenerationRequest,
     ThoughtGraphEngine,
     IndexedThoughtReader,
@@ -148,8 +148,8 @@ def test_provider_output_schema_failure_is_reported():
         engine.generate(HorizontalGenerationRequest(idea="systems", model="fake-model"))
 
 
-from bot0_thought_graph.models import IdeaClusterJSONModel
-from bot0_thought_graph.thought_generation.ranking import convert_clusters_to_idea, select_clusters
+from xf_thoughtgraph.models import IdeaClusterJSONModel
+from xf_thoughtgraph.thought_generation.ranking import convert_clusters_to_idea, select_clusters
 
 
 def test_reader_surface_covers_idea_thoughts_and_descriptions():

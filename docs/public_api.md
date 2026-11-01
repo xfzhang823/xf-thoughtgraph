@@ -10,10 +10,6 @@ The stable top-level entry points are:
 
 Requests, models, policies, and adapter classes are available from their subpackages. Provider SDK adapters are lazy and require the `providers` extra; fake/custom providers require no SDK client construction.
 
-Interview and conversational workflows are outside this package. A future
-interview/application package may depend on the graph-generation API, graph
-models, provider contracts, storage contracts, and package-level reflection.
-
 The package is synchronous at its public engine boundary. It has no global clients, repository-root discovery, automatic persistence, or import-time network/filesystem behavior. Callers may extend it by implementing `LLMProvider` or `Repository` and injecting those objects.
 
 ## External consumer workflow
@@ -21,7 +17,7 @@ The package is synchronous at its public engine boundary. It has no global clien
 The preferred simple API delegates to the canonical `ThoughtGraphEngine`:
 
 ```python
-from bot0_thought_graph import ProgressionType, generate_thought_graph
+from xf_thoughtgraph import ProgressionType, generate_thought_graph
 
 graph = generate_thought_graph(
     "hospital emergency department operations",
@@ -42,7 +38,7 @@ object is the canonical `ThoughtGraph`.
 For advanced controls, use the existing `ThoughtGraphEngine` façade:
 
 ```python
-from bot0_thought_graph import ThoughtGraphEngine
+from xf_thoughtgraph import ThoughtGraphEngine
 
 generator = ThoughtGraphEngine(
     provider="deepseek",
@@ -51,14 +47,23 @@ generator = ThoughtGraphEngine(
 
 graph = generator.generate_thought_graph(
     topic="clinical research participant recruitment",
-    depth=3,
-    breadth=5,
+    horizontal=5,
+    vertical=3,
 )
 ```
 
-`provider` accepts `"openai"`, `"gemini"`, `"deepseek"`, or `"anthropic"`. Named providers are created through the existing provider factory. Set `model=None` to use the package default, with `<PROVIDER>_MODEL` taking precedence. Defaults are resolved by `bot0_thought_graph.providers.default_model(provider)`: OpenAI `gpt-5.6-luna`, Gemini `gemini-3.6-flash`, DeepSeek `deepseek-v4-flash`, Anthropic `claude-3-5-sonnet-20241022`. The returned value is always the package-owned `ThoughtGraph` model, independent of the provider SDK.
+`provider` accepts `"openai"`, `"gemini"`, `"deepseek"`, or `"anthropic"`. Named providers are created through the existing provider factory. Set `model=None` to use the package default, with `<PROVIDER>_MODEL` taking precedence. Defaults are resolved by `xf_thoughtgraph.providers.default_model(provider)`: OpenAI `gpt-5.6-luna`, Gemini `gemini-3.6-flash`, DeepSeek `deepseek-v4-flash`, Anthropic `claude-3-5-sonnet-20241022`. The returned value is always the package-owned `ThoughtGraph` model, independent of the provider SDK.
 
-`horizontal` is the maximum number of root-level peer directions retained; `vertical` is the maximum number of generated child levels beneath the root. `vertical=1` returns the root plus its first horizontal layer; `vertical=2` adds one vertical expansion beneath each first-level thought. Explicit horizontal and vertical values are independent, and the horizontal value is not reused as the vertical child-count limit. The legacy `depth=` and `breadth=` arguments remain supported and cannot be mixed with the new names. Legacy `depth=` remains bounded at 3; new `vertical=` values are bounded by `ThoughtGraphEngine.MAX_FACADE_DEPTH`. The `topic=` parameter is canonical; the existing `concept=` parameter remains supported as an alias (supply only one). Vertical expansion in `generate_thought_graph()` accepts `progression_type=` (default `ProgressionType.IMPLEMENTATION_STEPS`). Results use Pydantic's standard `model_dump()` and `model_dump_json()` serialization.
+`horizontal` is the maximum number of root-level peer directions retained;
+`vertical` is the maximum number of generated child levels beneath the root.
+`vertical=1` returns the root plus its first horizontal layer; `vertical=2`
+adds one vertical expansion beneath each first-level thought. Explicit
+horizontal and vertical values are independent, and the horizontal value is
+not reused as the vertical child-count limit. New vertical values are bounded
+by `ThoughtGraphEngine.MAX_FACADE_DEPTH`. When neither bound is supplied, the
+engine uses adaptive exploration. Vertical expansion accepts
+`progression_type=` (default `ProgressionType.IMPLEMENTATION_STEPS`). Results
+use Pydantic's standard `model_dump()` and `model_dump_json()` serialization.
 
 Direct provider-object injection remains supported:
 
@@ -102,12 +107,16 @@ Participant recruitment
 These problem-solution items are sibling thoughts under each horizontal
 dimension. `ProgressionType` describes the semantic relationship among the
 vertical children; it does not itself add tree depth or alter the horizontal
-layer. Depth is controlled separately by `depth`/`vertical` or adaptive
-exploration. In adaptive mode, `focused`, `balanced`, and `rich` control
+layer. Tree depth is controlled by `vertical` or adaptive exploration. In
+adaptive mode, `focused`, `balanced`, and `rich` control
 whether a branch continues, while `progression_type` controls the meaning of
 the children generated when it does continue.
 
-When no graph-shape bounds are supplied, `generate_thought_graph()` uses the `balanced` adaptive exploration profile. The `exploration=` argument accepts `"focused"`, `"balanced"`, or `"rich"`; profiles control continuation and stopping decisions rather than mapping to fixed breadth/depth values. Adaptive profiles cannot be combined with explicit `horizontal=`/`vertical=` or legacy `breadth=`/`depth=` arguments.
+When no graph-shape bounds are supplied, `generate_thought_graph()` uses the
+`balanced` adaptive exploration profile. The `exploration=` argument accepts
+`"focused"`, `"balanced"`, or `"rich"`; profiles control continuation and
+stopping decisions rather than mapping to fixed graph sizes. Adaptive profiles
+cannot be combined with explicit `horizontal=`/`vertical=` arguments.
 
 Adaptive horizontal exploration probes small bounded candidate batches and
 evaluates distinctness and marginal value locally before requesting further
@@ -116,14 +125,14 @@ width control.
 
 Adaptive traversal can retain a useful generated child while pruning it from further recursive expansion. Semantic stopping remains distinct from internal safety stopping; if an internal guard is reached, the engine returns the valid partial graph and records the safety category in its exploration trace. Guard values are internal and are not public graph-shape controls.
 
-Set `ranked=True` on horizontal or graph methods to use the existing clustering/ranking path. `expand_subtopic()` and `generate_thought_graph()` accept `progression_type=` (a `ProgressionType` member or its string value; default `ProgressionType.IMPLEMENTATION_STEPS`) to select the parent→child semantic relationship. `ProgressionType` (`implementation_steps`, `simple_to_complex`, `chronological`, `problem_solution`, `prerequisite_dependency`) is exported from `bot0_thought_graph` and `bot0_thought_graph.models`. Vertical expansion preserves provider order.
+Set `ranked=True` on horizontal or graph methods to use the existing clustering/ranking path. `expand_subtopic()` and `generate_thought_graph()` accept `progression_type=` (a `ProgressionType` member or its string value; default `ProgressionType.IMPLEMENTATION_STEPS`) to select the parent→child semantic relationship. `ProgressionType` (`implementation_steps`, `simple_to_complex`, `chronological`, `problem_solution`, `prerequisite_dependency`) is exported from `xf_thoughtgraph` and `xf_thoughtgraph.models`. Vertical expansion preserves provider order.
 
 ## Advanced typed API
 
 The existing request-based API remains supported for explicit controls:
 
 ```python
-from bot0_thought_graph.thought_generation import HorizontalGenerationRequest
+from xf_thoughtgraph.thought_generation import HorizontalGenerationRequest
 
 result = engine.generate(
     HorizontalGenerationRequest(
@@ -132,7 +141,5 @@ result = engine.generate(
 )
 ```
 
-Intentional differences from legacy application behavior:
-- Thought-engine clustering is explicit rather than hidden in every generation call.
-- Persistence is optional and explicit.
-- Legacy facilitator retries and file-backed conversation logging are not included.
+The graph engine owns clustering, persistence boundaries, and generation
+behavior directly. Persistence is optional and explicit.

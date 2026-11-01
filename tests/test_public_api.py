@@ -2,8 +2,8 @@
 
 import pytest
 
-import bot0_thought_graph.public_api as public_api
-from bot0_thought_graph import ProgressionType
+import xf_thoughtgraph.public_api as public_api
+from xf_thoughtgraph import ProgressionType
 
 
 class _FakeEngine:
@@ -21,7 +21,7 @@ class _FakeEngine:
 
 
 def test_root_export_is_importable():
-    from bot0_thought_graph import ThoughtGraphEngine, generate_thought_graph
+    from xf_thoughtgraph import ThoughtGraphEngine, generate_thought_graph
 
     assert callable(generate_thought_graph)
     assert ThoughtGraphEngine is not None

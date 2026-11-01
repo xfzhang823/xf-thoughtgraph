@@ -4,7 +4,8 @@
 
 > Historical snapshot: the interview engine and legacy top-level source
 > surfaces described below were subsequently retired. See
-> `docs/architecture/legacy_src_retirement_audit.md` for the retirement record.
+> the repository history and `docs/simplification_audit.md` for the later
+> package cleanup record.
 
 `src/bot0_thought_graph/` contains the reusable deterministic models and prompts, provider-neutral contracts and lazy SDK adapters, optional storage, and thought-generation engine. It has no imports from legacy application code.
 

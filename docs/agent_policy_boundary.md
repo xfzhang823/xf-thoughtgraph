@@ -1,6 +1,6 @@
 # Agent Policy Boundary
 
-`bot0-thought-graph` is a reusable thought-generation library. The canonical execution path is:
+`xf-thoughtgraph` is a reusable thought-generation library. The canonical execution path is:
 
 `ThoughtGraphEngine` -> horizontal/vertical generation -> prompt -> provider -> parsing -> `ThoughtGraph`
 
@@ -54,7 +54,7 @@ That control logic is application policy and should not be embedded in `ThoughtG
 
 Dependency direction should stay one-way:
 
-`consuming application / agents` -> `bot0-thought-graph`
+`consuming application / agents` -> `xf-thoughtgraph`
 
 The package should not depend on controller agents, application pipelines, or runtime state owned by the consumer.
 

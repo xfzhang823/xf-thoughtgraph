@@ -4,7 +4,7 @@ import json
 
 from support import FakeProvider
 
-from bot0_thought_graph import ProgressionType, ThoughtGraphEngine, generate_thought_graph
+from xf_thoughtgraph import ProgressionType, ThoughtGraphEngine, generate_thought_graph
 
 
 HORIZONTAL = (
@@ -26,7 +26,7 @@ engine = ThoughtGraphEngine(provider, model="example-model")
 subtopics = engine.generate_subtopics("systems", max_subtopics=2)
 details = engine.expand_subtopic("systems", "hardware", max_details=2)
 thought_array = engine.generate_array_of_thoughts("systems", max_subtopics=2)
-graph = engine.generate_thought_graph("systems", depth=2, breadth=2)
+graph = engine.generate_thought_graph("systems", horizontal=2, vertical=2)
 
 print("subtopics:", subtopics)
 print("details:", details)

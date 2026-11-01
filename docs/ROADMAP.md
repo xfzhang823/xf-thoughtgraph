@@ -1,4 +1,4 @@
-# Roadmap — bot0-thought-graph
+# Roadmap — xf-thoughtgraph
 
 > Historical roadmap: the legacy source layer referenced below was retired in
 > the final legacy architecture cleanup. The canonical package is now the only
@@ -20,9 +20,11 @@ Status: 2026-08-10. Companion documents: `docs/MASTER_AUDIT.md` (audit) and `doc
 - CODE-02: Legacy hard-coded model strings — `gpt-4-turbo` / `gpt-3.5-turbo` / `claude-3-5-sonnet-20241022` defaults in legacy `src/` modules.
 - T-04: Legacy test debt — `test_question_loading.py` (hard-coded Windows paths, `os.chdir`) and `test_question_generator_async.py` (duplicates its integration twin). Note: `tests/test_behavior_test.py` has 4 pre-existing failures pending the `examples/behavior_test.py` CLI-harness rewrite.
 
-## Kept for legacy compatibility
+## Legacy compatibility cleanup
 
-- C-05: `src/models/user_state_models.py` (used only by `src/agents/state_management.py`) and the four re-export shims (`thought_models.py`, `evaluation_models.py`, `indexed_thought_models.py`, `llm_response_models.py`) that let legacy importers and the parity test resolve the package's classes. Revisit when the legacy layer is retired.
+The package no longer retains interview-era models, prompts, response-model
+exports, or legacy graph-parameter aliases. Historical audit records may still
+mention the removed surfaces, but they are not supported package APIs.
 
 ## Open recommendations
 

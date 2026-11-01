@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from bot0_thought_graph import _env as env_module
-from bot0_thought_graph.config import Bot0Config, ProviderConfig
-from bot0_thought_graph.providers import (
+from xf_thoughtgraph import _env as env_module
+from xf_thoughtgraph.config import ProviderConfig, ThoughtGraphConfig
+from xf_thoughtgraph.providers import (
     create_provider,
     GenerationRequest,
     GenerationResult,
@@ -14,7 +14,7 @@ from bot0_thought_graph.providers import (
     ProviderRequestError,
     ProviderResponseError,
 )
-from bot0_thought_graph.storage import JsonRepository, MemoryRepository
+from xf_thoughtgraph.storage import JsonRepository, MemoryRepository
 
 
 class FakeCompletions:
@@ -48,7 +48,7 @@ def request():
 
 
 def test_provider_contract_and_openai_adapter_without_network():
-    OpenAIProvider = pytest.importorskip("bot0_thought_graph.providers.openai").OpenAIProvider
+    OpenAIProvider = pytest.importorskip("xf_thoughtgraph.providers.openai").OpenAIProvider
     completions = FakeCompletions(SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="answer"))]))
     provider = OpenAIProvider(client=SimpleNamespace(chat=SimpleNamespace(completions=completions)))
     assert isinstance(provider, LLMProvider)
@@ -60,7 +60,7 @@ def test_provider_contract_and_openai_adapter_without_network():
 
 
 def test_anthropic_adapter_and_malformed_responses():
-    AnthropicProvider = pytest.importorskip("bot0_thought_graph.providers.anthropic").AnthropicProvider
+    AnthropicProvider = pytest.importorskip("xf_thoughtgraph.providers.anthropic").AnthropicProvider
     messages = FakeMessages(SimpleNamespace(content=[SimpleNamespace(text="answer")]))
     provider = AnthropicProvider(client=SimpleNamespace(messages=messages))
     assert provider.generate(request()).text == "answer"
@@ -73,8 +73,8 @@ def test_anthropic_adapter_and_malformed_responses():
 
 
 def test_provider_exception_translation_and_no_import_time_clients(monkeypatch, tmp_path):
-    OpenAIProvider = pytest.importorskip("bot0_thought_graph.providers.openai").OpenAIProvider
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    OpenAIProvider = pytest.importorskip("xf_thoughtgraph.providers.openai").OpenAIProvider
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
     failing_openai = OpenAIProvider(
         client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions(error=RuntimeError("offline"))))
     )
@@ -108,7 +108,7 @@ def test_repository_env_loader_respects_os_precedence(monkeypatch, tmp_path):
 
 
 def test_openai_provider_uses_openai_api_key_from_environment(monkeypatch):
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "os-openai")
@@ -122,12 +122,12 @@ def test_openai_provider_uses_openai_api_key_from_environment(monkeypatch):
             self.chat = SimpleNamespace(completions=FakeCompletions())
 
     monkeypatch.setattr(helper_module, "OpenAI", FakeOpenAI)
-    pytest.importorskip("bot0_thought_graph.providers.openai").OpenAIProvider()
+    pytest.importorskip("xf_thoughtgraph.providers.openai").OpenAIProvider()
     assert seen["api_key"] == "os-openai"
 
 
 def test_anthropic_provider_uses_anthropic_api_key_from_environment(monkeypatch):
-    anthropic_module = pytest.importorskip("bot0_thought_graph.providers.anthropic")
+    anthropic_module = pytest.importorskip("xf_thoughtgraph.providers.anthropic")
 
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
@@ -146,8 +146,8 @@ def test_anthropic_provider_uses_anthropic_api_key_from_environment(monkeypatch)
 
 
 def test_gemini_provider_uses_openai_compatible_base_url_and_api_key(monkeypatch):
-    gemini_module = pytest.importorskip("bot0_thought_graph.providers.gemini")
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    gemini_module = pytest.importorskip("xf_thoughtgraph.providers.gemini")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "os-gemini")
@@ -181,8 +181,8 @@ def test_gemini_provider_uses_openai_compatible_base_url_and_api_key(monkeypatch
 
 
 def test_deepseek_provider_uses_openai_compatible_base_url_and_reasoning_separation(monkeypatch):
-    deepseek_module = pytest.importorskip("bot0_thought_graph.providers.deepseek")
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    deepseek_module = pytest.importorskip("xf_thoughtgraph.providers.deepseek")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
 
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     monkeypatch.setenv("DEEPSEEK_API_KEY", "os-deepseek")
@@ -231,7 +231,7 @@ def test_deepseek_provider_uses_openai_compatible_base_url_and_reasoning_separat
     ],
 )
 def test_deepseek_provider_sets_thinking_mode(thinking, expected):
-    deepseek_module = pytest.importorskip("bot0_thought_graph.providers.deepseek")
+    deepseek_module = pytest.importorskip("xf_thoughtgraph.providers.deepseek")
     completions = FakeCompletions(
         SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="answer"))])
     )
@@ -246,7 +246,7 @@ def test_deepseek_provider_sets_thinking_mode(thinking, expected):
 
 
 def test_deepseek_provider_none_preserves_provider_default():
-    deepseek_module = pytest.importorskip("bot0_thought_graph.providers.deepseek")
+    deepseek_module = pytest.importorskip("xf_thoughtgraph.providers.deepseek")
     completions = FakeCompletions(
         SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="answer"))])
     )
@@ -261,7 +261,7 @@ def test_deepseek_provider_none_preserves_provider_default():
 
 
 def test_deepseek_provider_rejects_invalid_thinking_value():
-    deepseek_module = pytest.importorskip("bot0_thought_graph.providers.deepseek")
+    deepseek_module = pytest.importorskip("xf_thoughtgraph.providers.deepseek")
     completions = FakeCompletions()
 
     with pytest.raises(TypeError, match="thinking must be True, False, or None"):
@@ -273,7 +273,7 @@ def test_deepseek_provider_rejects_invalid_thinking_value():
 
 
 def test_provider_factory_supports_gemini_and_deepseek(monkeypatch):
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
     monkeypatch.setattr(helper_module, "load_repository_env", lambda: None)
     monkeypatch.setenv("GEMINI_API_KEY", "os-gemini")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "os-deepseek")
@@ -293,7 +293,7 @@ def test_provider_factory_supports_gemini_and_deepseek(monkeypatch):
 
 
 def test_openai_compatible_requests_use_completion_token_field_for_gpt5_models():
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
     request = GenerationRequest("Explain systems", "gpt-5-mini-2025-08-07", max_tokens=42)
     kwargs = helper_module.build_chat_completion_kwargs(request)
     assert "temperature" not in kwargs
@@ -303,7 +303,7 @@ def test_openai_compatible_requests_use_completion_token_field_for_gpt5_models()
 
 
 def test_openai_compatible_gpt5_reasoning_effort_can_be_overridden(monkeypatch):
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
     monkeypatch.setenv("OPENAI_REASONING_EFFORT", "xhigh")
     request = GenerationRequest("Explain systems", "gpt-5.6-luna", max_tokens=42)
     kwargs = helper_module.build_chat_completion_kwargs(request)
@@ -311,7 +311,7 @@ def test_openai_compatible_gpt5_reasoning_effort_can_be_overridden(monkeypatch):
 
 
 def test_openai_compatible_extra_body_is_forwarded_without_affecting_defaults():
-    helper_module = pytest.importorskip("bot0_thought_graph.providers.openai_compatible")
+    helper_module = pytest.importorskip("xf_thoughtgraph.providers.openai_compatible")
     request = GenerationRequest("Explain systems", "test-model", max_tokens=42)
     kwargs = helper_module.build_chat_completion_kwargs(
         request, extra_body={"example": {"enabled": True}}
@@ -323,8 +323,8 @@ def test_openai_compatible_extra_body_is_forwarded_without_affecting_defaults():
 
 @pytest.mark.asyncio
 async def test_async_adapters_use_injected_clients():
-    AsyncOpenAIProvider = pytest.importorskip("bot0_thought_graph.providers.openai").AsyncOpenAIProvider
-    AsyncAnthropicProvider = pytest.importorskip("bot0_thought_graph.providers.anthropic").AsyncAnthropicProvider
+    AsyncOpenAIProvider = pytest.importorskip("xf_thoughtgraph.providers.openai").AsyncOpenAIProvider
+    AsyncAnthropicProvider = pytest.importorskip("xf_thoughtgraph.providers.anthropic").AsyncAnthropicProvider
     class AsyncCompletions(FakeCompletions):
         async def create(self, **kwargs):
             return super().create(**kwargs)
@@ -372,13 +372,13 @@ def test_json_repository_round_trip_invalid_json_and_explicit_path(tmp_path):
 
 
 def test_configuration_is_explicit_and_has_no_storage_default():
-    config = Bot0Config(provider=ProviderConfig(provider="openai", model="test-model"))
+    config = ThoughtGraphConfig(provider=ProviderConfig(provider="openai", model="test-model"))
     assert config.provider.model == "test-model"
     assert not hasattr(config, "storage_path")
 
 
 def test_default_model_resolves_per_provider_defaults(monkeypatch):
-    from bot0_thought_graph.providers import default_model
+    from xf_thoughtgraph.providers import default_model
 
     for name in ("openai", "gemini", "deepseek", "anthropic"):
         monkeypatch.delenv(f"{name.upper()}_MODEL", raising=False)
@@ -389,7 +389,7 @@ def test_default_model_resolves_per_provider_defaults(monkeypatch):
 
 
 def test_default_model_env_override_and_unknown_provider(monkeypatch):
-    from bot0_thought_graph.providers import default_model
+    from xf_thoughtgraph.providers import default_model
 
     monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
     assert default_model("deepseek") == "deepseek-v4-pro"

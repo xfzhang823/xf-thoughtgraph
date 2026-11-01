@@ -2,6 +2,11 @@
 
 > Historical cleanup plan: subsequent legacy source retirement completed the
 > deferred legacy-scope work described in this document.
+>
+> Historical naming is retained in the plan entries below. The current
+> package identity is `XF ThoughtGraph` / `xf-thoughtgraph` / `xf_thoughtgraph`.
+> The later simplification cleanup also removed the interview-era package
+> surfaces and legacy graph-parameter compatibility described below.
 
 ## Scope and Method
 

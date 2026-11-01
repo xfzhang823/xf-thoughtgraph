@@ -4,9 +4,9 @@ import re
 
 import pytest
 
-from bot0_thought_graph import ProgressionType, ThoughtArray, ThoughtGraph, ThoughtGraphEngine
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult
-from bot0_thought_graph.thought_generation import engine as engine_module
+from xf_thoughtgraph import ProgressionType, ThoughtArray, ThoughtGraph, ThoughtGraphEngine
+from xf_thoughtgraph.providers import GenerationRequest, GenerationResult
+from xf_thoughtgraph.thought_generation import engine as engine_module
 
 
 @dataclass
@@ -166,7 +166,7 @@ def test_structured_array_and_graph_are_public_typed_results_without_persistence
     provider = FakeProvider([HORIZONTAL, VERTICAL, VERTICAL, VERTICAL])
     engine = ThoughtGraphEngine(provider)
     graph = engine.generate_thought_graph(
-        "Clinical research recruitment", depth=2, breadth=2
+        "Clinical research recruitment", horizontal=2, vertical=2
     )
     assert isinstance(graph, ThoughtGraph)
     assert graph.concept == "Clinical research recruitment"
@@ -174,7 +174,7 @@ def test_structured_array_and_graph_are_public_typed_results_without_persistence
     assert graph.breadth == 2
     assert graph.root.name == graph.concept
     assert len(graph.root.children) == 2
-    assert all(len(child.children) == 2 for child in graph.root.children)
+    assert all(len(child.children) == 3 for child in graph.root.children)
     assert len(provider.requests) == 3  # one horizontal call plus one per branch
     assert all("implementation steps" in request.prompt for request in provider.requests[1:])
     assert all(
@@ -184,10 +184,10 @@ def test_structured_array_and_graph_are_public_typed_results_without_persistence
     assert ProgressionType.IMPLEMENTATION_STEPS.value == "implementation_steps"
 
 
-def test_graph_depth_one_has_no_vertical_calls_and_breadth_is_enforced():
+def test_graph_vertical_one_has_no_vertical_calls_and_horizontal_is_enforced():
     provider = FakeProvider([HORIZONTAL])
     graph = ThoughtGraphEngine(provider).generate_thought_graph(
-        "Clinical research recruitment", depth=1, breadth=1
+        "Clinical research recruitment", horizontal=1, vertical=1
     )
     assert len(graph.root.children) == 1
     assert graph.root.children[0].children == []
@@ -198,8 +198,8 @@ def test_graph_normalizes_progression_type_and_includes_it_in_vertical_prompts()
     provider = FakeProvider([HORIZONTAL, VERTICAL, VERTICAL, VERTICAL])
     graph = ThoughtGraphEngine(provider).generate_thought_graph(
         "Clinical research recruitment",
-        depth=2,
-        breadth=2,
+        horizontal=2,
+        vertical=2,
         progression_type="prerequisite_dependency",
     )
 
@@ -308,22 +308,6 @@ def test_new_vertical_bound_has_no_off_by_one(vertical):
 
 
 @pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"depth": 2, "horizontal": 2},
-        {"breadth": 3, "vertical": 4},
-        {"depth": 2, "vertical": 4},
-        {"breadth": 3, "horizontal": 2},
-    ],
-)
-def test_new_bounds_reject_mixed_legacy_bounds_before_provider_calls(kwargs):
-    provider = FakeProvider([])
-    with pytest.raises(ValueError, match="cannot be combined"):
-        ThoughtGraphEngine(provider).generate_thought_graph("systems", **kwargs)
-    assert provider.requests == []
-
-
-@pytest.mark.parametrize(
     ("keyword", "value"),
     [
         ("horizontal", 0),
@@ -345,13 +329,6 @@ def test_new_bounds_reject_invalid_values_before_provider_calls(keyword, value):
         ThoughtGraphEngine(provider).generate_thought_graph(
             "systems", **{keyword: value}
         )
-    assert provider.requests == []
-
-
-def test_legacy_depth_retains_the_previous_maximum():
-    provider = FakeProvider([])
-    with pytest.raises(ValueError, match="depth must be <= 3"):
-        ThoughtGraphEngine(provider).generate_thought_graph("systems", depth=4)
     assert provider.requests == []
 
 
@@ -1191,8 +1168,6 @@ def test_invalid_exploration_is_rejected_before_provider_calls(value):
     [
         {"exploration": "balanced", "horizontal": 2},
         {"exploration": "balanced", "vertical": 8},
-        {"exploration": "balanced", "depth": 2},
-        {"exploration": "balanced", "breadth": 3},
     ],
 )
 def test_adaptive_mode_rejects_shape_bounds_before_provider_calls(kwargs):
@@ -1209,9 +1184,9 @@ def test_adaptive_mode_rejects_shape_bounds_before_provider_calls(kwargs):
         lambda engine: engine.expand_subtopic("concept", "\t"),
         lambda engine: engine.generate_subtopics("concept", max_subtopics=0),
         lambda engine: engine.expand_subtopic("concept", "topic", max_details=-1),
-        lambda engine: engine.generate_thought_graph("concept", depth=0),
-        lambda engine: engine.generate_thought_graph("concept", breadth=0),
-        lambda engine: engine.generate_thought_graph("concept", depth=9),
+        lambda engine: engine.generate_thought_graph("concept", horizontal=0),
+        lambda engine: engine.generate_thought_graph("concept", vertical=0),
+        lambda engine: engine.generate_thought_graph("concept", vertical=9),
     ],
 )
 def test_concept_first_validation_rejects_invalid_input(call):
@@ -1228,22 +1203,10 @@ def test_named_provider_and_model_validation_are_clear():
 
 def test_graph_is_provider_independent_and_serializable():
     graph = ThoughtGraphEngine(FakeProvider([HORIZONTAL])).generate_thought_graph(
-        "systems", depth=1, breadth=2
+        "systems", horizontal=2, vertical=1
     )
 
     payload = graph.model_dump()
     assert payload["concept"] == "systems"
     assert payload["root"]["children"][0]["name"] == "Participant eligibility"
     assert graph.model_dump_json()
-
-
-def test_graph_accepts_topic_alias_without_changing_concept_api():
-    graph = ThoughtGraphEngine(FakeProvider([HORIZONTAL])).generate_thought_graph(
-        topic="systems", depth=1, breadth=2
-    )
-
-    assert graph.concept == "systems"
-    with pytest.raises(ValueError, match="either concept or topic"):
-        ThoughtGraphEngine(FakeProvider([])).generate_thought_graph(
-            "systems", topic="other"
-        )

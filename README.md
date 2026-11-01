@@ -1,274 +1,251 @@
-# bot0-thought-graph
+# XF ThoughtGraph
 
-**Version 0.1.0** · Python ≥ 3.10 · Pre-1.0: the documented core API is intended for reuse, but minor releases may still refine interfaces before 1.0.
+XF ThoughtGraph is a Python library for turning a complex concept into a structured thought graph. It explores the major dimensions of a topic horizontally, then develops selected thoughts vertically into more detailed, ordered, or dependent ideas.
 
-`bot0-thought-graph` is a standalone Python package for reusable complex-topic disaggregation and structured thought generation. It keeps persistence behind explicit caller-supplied interfaces: it makes no provider requests or automatic writes during import, and only constructs a provider client when generation is requested through the configured API.
+The library exists for cases where a single list of model-generated ideas is too shallow, but an unbounded recursive conversation is too expensive and difficult to control. It combines provider-assisted generation with deterministic filtering, explicit safety limits, and an evaluation step that decides whether another decomposition level is worth the next provider call.
 
-## Capabilities
+The result is a validated tree of `ThoughtNode` objects in a `ThoughtGraph`. The graph preserves the distinction between sibling exploration and parent-child decomposition; it does not create arbitrary cross-branch edges.
 
-- ✨ **Concept-first façade** — `generate_thought_graph()` is the simple entry point for turning one topic into a structured hierarchy. `ThoughtGraphEngine` remains available for advanced/configurable generation.
-- Horizontal and vertical thought generation with an optional clustering/ranking pass (`ranked=True` or `num_clusters`/`top_n`).
-- Deterministic indexing, parsing, validation, and hierarchy traversal — no provider calls involved.
-- ✨ **Four provider adapters** — OpenAI, Anthropic, Google Gemini, and DeepSeek — each with sync and async variants behind one `LLMProvider` protocol.
-- Optional in-memory or caller-selected JSON persistence (`MemoryRepository`, `JsonRepository`).
+## Local Setup (Clone and Run)
 
-## Installation
+Use this workflow when you want to run the repository's examples or tests from a checkout. It is separate from installing XF ThoughtGraph as a dependency in another Python project.
 
-Requires Python 3.10 or newer.
-
-Python support is declared in the package metadata and lockfile as `>=3.10`.
-The test suite is currently validated on Python 3.12; the repository does not
-yet define a multi-version CI matrix.
+Prerequisites: Git, Python 3.10 or newer, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv add bot0-thought-graph
-# Optional provider extras remain available for compatibility with existing installs:
-uv add "bot0-thought-graph[providers]"
+git clone https://github.com/xfzhang823/xf-thoughtgraph.git
+cd xf-thoughtgraph
+uv sync --extra providers --extra dev
 ```
 
-With pip:
+Configure the API key for the provider you want to call. For example:
 
 ```bash
-pip install bot0-thought-graph
-# Optional provider extras remain available for compatibility with existing installs:
-pip install "bot0-thought-graph[providers]"
+export OPENAI_API_KEY="your-api-key"
 ```
 
-The published package declares `pandas`, `pydantic`, `openai`, and `anthropic`
-as runtime dependencies. Provider adapter modules are still imported lazily;
-the root import does not construct SDK clients or make provider requests.
-
-For a checkout:
+The other built-in providers use `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `DEEPSEEK_API_KEY`. Then run a minimal live thought-generation request:
 
 ```bash
-uv sync
-```
-
-## Concept-first usage
-
-The simplest external workflow uses the root-level convenience function. Pass a provider name (or an injected `LLMProvider`); when a named provider is used, omitting `model` uses the existing provider default and `<PROVIDER>_MODEL` environment override:
-
-```python
-from bot0_thought_graph import ProgressionType, generate_thought_graph
+uv run python - <<'PY'
+from xf_thoughtgraph import generate_thought_graph
 
 graph = generate_thought_graph(
-    "hospital emergency department operations",
-    exploration="balanced",
-    progression_type=ProgressionType.PREREQUISITE_DEPENDENCY,
-    provider="deepseek",
-)
-```
-
-Provider selection is explicit because the package does not choose an arbitrary provider when none is configured. The optional `progression_type` selects the semantic relationship between vertically generated parent and child thoughts; it defaults to `ProgressionType.IMPLEMENTATION_STEPS` and does not change exploration shape. Use `ThoughtGraphEngine` directly when you need shape bounds, ranking, persistence, or other advanced options.
-
-The supported provider names are `openai`, `gemini`, `deepseek`, and `anthropic`. Use `model=None` to select the package default; a `<PROVIDER>_MODEL` environment variable takes precedence. `horizontal` is the maximum number of root-level peer directions retained. `vertical` is the maximum number of generated child levels beneath the root. `vertical=1` returns the root plus its first horizontal layer, and `vertical=2` adds one vertical expansion beneath that layer. Explicit `horizontal` and `vertical` values are independent; the horizontal value is not reused as the vertical child count. The legacy `depth` and `breadth` arguments remain supported for compatibility and cannot be mixed with the new arguments. The façade supports legacy `depth` values through 3 and new `vertical` values through `MAX_FACADE_DEPTH` (currently eight child levels). The existing `concept=` parameter remains supported as an alias for `topic=`.
-
-For advanced callers, direct provider injection remains supported. Supply a provider implementation or an explicitly constructed SDK client:
-
-```python
-from bot0_thought_graph import ThoughtGraphEngine
-from bot0_thought_graph.providers import OpenAIProvider
-
-provider = OpenAIProvider(client=my_openai_client)  # or api_key=...
-engine = ThoughtGraphEngine(provider, model="your-model")
-```
-
-Tests and applications can provide any object implementing the `LLMProvider` protocol. With a fake or configured provider:
-
-```python
-from bot0_thought_graph import ThoughtGraphEngine
-
-engine = ThoughtGraphEngine(provider, model="your-model")
-subtopics = engine.generate_subtopics("Clinical research recruitment")
-details = engine.expand_subtopic(
-    concept="Clinical research recruitment",
-    subtopic="Participant eligibility",
-)
-thought_array = engine.generate_array_of_thoughts("Clinical research recruitment")
-graph = engine.generate_thought_graph(
-    "Clinical research recruitment",
+    "Design a reliable data ingestion platform",
+    provider="openai",
     horizontal=2,
-    vertical=8,
+    vertical=1,
 )
+print(graph.model_dump_json(indent=2))
+PY
 ```
 
-`generate_subtopics()` and `generate_array_of_thoughts()` perform horizontal expansion: they return distinct major dimensions at a similar level of abstraction. `expand_subtopic()` performs one-level vertical expansion using implementation-step semantics by default. The convenience list methods return `list[str]`; structured methods return `ThoughtArray` and `ThoughtGraph`.
-
-Graph `vertical=1` returns the root concept and its first-level subtopics; `vertical=2` adds one vertical expansion under each first-level subtopic. The explicit `horizontal` value caps root-level peer directions, while vertical expansions use an internal child cap independent of horizontal breadth. The legacy `depth`/`breadth` arguments retain their previous shared-child-limit behavior. Set `ranked=True` on horizontal or graph methods to route the first-level subtopics through the clustering/ranking pipeline. The vertical methods `expand_subtopic()` and `generate_thought_graph()` accept `progression_type=` — a `ProgressionType` member or its string value — to select the semantic relationship between a parent thought and its children; both default to `ProgressionType.IMPLEMENTATION_STEPS`. These methods do not persist results.
-
-The graph is built in two conceptual stages: horizontal generation identifies
-broad, parallel dimensions of the root concept, and vertical generation makes
-each dimension more specific. For example, with
-`progression_type=ProgressionType.PROBLEM_SOLUTION`:
-
-```text
-Participant recruitment
-├── Recruitment strategy
-│   ├── Low awareness → targeted outreach
-│   ├── Limited referrals → clinic partnerships
-│   └── Ineffective messaging → plain-language materials
-└── Participant eligibility
-    ├── Eligibility confusion → clear screening criteria
-    └── Screening burden → a streamlined prescreening process
-```
-
-The problem-solution children remain sibling thoughts beneath their horizontal
-parent; the progression type does not itself create additional tree depth.
-`simple_to_complex`, `chronological`, and `prerequisite_dependency` similarly
-describe the semantic relationship among vertical children. Tree depth is
-controlled separately by `depth`/`vertical` or by adaptive exploration. In
-adaptive mode, `focused`, `balanced`, and `rich` decide whether a branch should
-continue, while `progression_type` describes the children generated when that
-branch is expanded.
-
-When no graph-shape bounds are supplied, `generate_thought_graph()` uses the `balanced` adaptive exploration profile. Callers may select `exploration="focused"`, `"balanced"`, or `"rich"` to change how readily horizontal directions and vertical branches continue. Adaptive exploration cannot be combined with `horizontal`/`vertical` or legacy `breadth`/`depth`. The profiles control continuation decisions rather than fixed graph sizes.
-
-Adaptive horizontal exploration uses small internal candidate batches and
-evaluates their distinctness and marginal value before requesting more peer
-coverage. This is an implementation detail; callers do not configure the
-batch size.
-
-Adaptive traversal may retain a useful child in the graph without recursively expanding that branch when its marginal value is insufficient. Semantic stopping is distinct from internal safety stopping; safety guards prevent runaway adaptive growth and return the valid partial graph produced so far. These guards are internal and are not ordinary graph-shape controls.
-
-## Provider support
-
-All adapters accept either an explicitly constructed SDK client (`client=...`) or an API key (`api_key=...`); with neither, they read a key from the environment. A `.env` file in the repository or any parent directory is loaded at provider-module import without overriding existing variables.
-
-| Provider | Status | Adapters | Environment variable | Endpoint / notes |
-|----------|--------|----------|----------------------|------------------|
-| OpenAI | ✅ Stable | `OpenAIProvider`, `AsyncOpenAIProvider` | `OPENAI_API_KEY` | Native OpenAI SDK |
-| Anthropic | ✅ Stable | `AnthropicProvider`, `AsyncAnthropicProvider` | `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY`) | Native Anthropic SDK; content-block responses normalized |
-| Google Gemini | ✨ New | `GeminiProvider`, `AsyncGeminiProvider` | `GEMINI_API_KEY` | OpenAI-compatible endpoint `https://generativelanguage.googleapis.com/v1beta/openai/` |
-| DeepSeek | ✨ New | `DeepSeekProvider`, `AsyncDeepSeekProvider` | `DEEPSEEK_API_KEY` | OpenAI-compatible endpoint `https://api.deepseek.com` |
-
-```python
-from bot0_thought_graph.providers import (
-    AnthropicProvider, DeepSeekProvider, GeminiProvider,
-    OpenAIProvider, create_provider,
-)
-
-openai_provider = OpenAIProvider()                       # uses OPENAI_API_KEY
-gemini_provider = GeminiProvider(api_key="...")          # explicit key wins
-anthropic_provider = AnthropicProvider(client=my_anthropic_client)  # injected client
-
-# Or by name:
-provider = create_provider("deepseek", api_key="...")    # "openai" | "claude" | "anthropic" | "gemini" | "deepseek"
-```
-
-Model identifiers are provider-specific strings passed through unchanged. When a named provider is used with `model=None`, the engine resolves a per-provider default through `bot0_thought_graph.providers.default_model()` — OpenAI `gpt-5.6-luna`, Gemini `gemini-3.6-flash`, DeepSeek `deepseek-v4-flash`, Anthropic `claude-3-5-sonnet-20241022` — and a `<PROVIDER>_MODEL` environment variable (for example `DEEPSEEK_MODEL`) overrides the default. Provider calls are normalized into `GenerationResult(text, provider, model, reasoning_content)`. For OpenAI-compatible providers that return reasoning (for example DeepSeek reasoning models), the reasoning text is preserved in `reasoning_content`.
-
-Failures are raised as typed exceptions from `bot0_thought_graph.providers`: `ProviderError` (base), `ProviderRequestError` (request rejected), and `ProviderResponseError` (response could not be normalized).
-
-### Custom providers
-
-`LLMProvider` is a `@runtime_checkable` protocol with a single method; any object satisfying it can be injected. The offline examples use a fake provider:
-
-```python
-from dataclasses import dataclass
-
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult
-
-@dataclass
-class FakeProvider:
-    responses: list[str]
-
-    def generate(self, request: GenerationRequest) -> GenerationResult:
-        return GenerationResult(self.responses.pop(0), "fake", request.model)
-```
-
-An async variant, `AsyncLLMProvider`, defines `async def generate(...)` and is implemented by all `Async*` adapters. The engines themselves are synchronous at their public boundary — see [docs/public_api.md](docs/public_api.md).
-
-## Advanced typed usage
-
-The request-based API remains available when callers need explicit generation controls — model settings, prompt overrides, progression types, or clustering and ranking:
-
-```python
-from bot0_thought_graph import ProgressionType
-from bot0_thought_graph.thought_generation import (
-    HorizontalGenerationRequest,
-    VerticalGenerationRequest,
-)
-
-result = engine.generate(
-    HorizontalGenerationRequest(
-        idea="embedded systems",
-        model="your-model",
-        num_thoughts=10,
-        num_clusters=3,   # both or neither; enables clustering + ranking
-        top_n=5,
-    )
-)  # -> IdeaJSONModel
-
-expanded = engine.expand(
-    VerticalGenerationRequest(
-        idea="embedded systems",
-        thought="toolchains",
-        model="your-model",
-        progression_type=ProgressionType.IMPLEMENTATION_STEPS,
-        num_sub_thoughts=7,
-    )
-)  # -> ThoughtJSONModel
-```
-
-`num_clusters` and `top_n` must be supplied together, otherwise `ValueError` is raised. Also available: `engine.expand_all(idea_model, model=...)` (expands every top-level thought in order, one provider call each), the static `engine.index(idea_model)` (deterministic zero-based indices, no provider call), and `engine.save(key, value)` (persists only when a repository was supplied — otherwise `RuntimeError`).
-
-## Persistence
-
-No files are written by default. Graph persistence requires both a repository
-and an explicit call through the graph engine.
-
-- `JsonRepository(directory)` writes `<key>.json` files atomically (temp file + `os.replace`) with sorted keys and ISO dates; keys must be plain filenames without path components.
-- `MemoryRepository()` keeps values for the instance lifetime.
-- `Repository[T]` (and `ThoughtRepository`) are the injectable contracts in `bot0_thought_graph.storage`; any object with `load(key)` / `save(key, value)` satisfies them.
-
-## Models and prompts
-
-Public models live in `bot0_thought_graph.models`. Concept-first results (`Thought`, `ThoughtArray`, `ThoughtNode`, `ThoughtGraph`) and the vertical-progression `ProgressionType` enum are exported at the package top level; the legacy-schema JSON models (`IdeaJSONModel`, `ThoughtJSONModel`, `SubThoughtJSONModel`, indexed variants, cluster models), evaluation models (`EvaluationCriteria`, `EvaluationJSONModel`, `QuestionAnswerPair`), and provider-neutral response models (`TextResponse`, `SubConcept`, `JSONResponse`, `TabularResponse`, `CodeResponse`) are exported from the `models` subpackage, along with `validate_thought_batch()`.
-
-All prompt templates are public constants in `bot0_thought_graph.prompts` — horizontal/vertical generation, concept subtopic/detail prompts, and clustering — and can be overridden per request via `prompt_template=`.
-
-## Architecture
-
-The package is organized into:
-
-- `bot0_thought_graph.models` — deterministic Pydantic domain models
-- `bot0_thought_graph.providers` — `LLMProvider`/`AsyncLLMProvider` contracts, `GenerationRequest`/`GenerationResult`, error types, lazy SDK adapters, `create_provider`
-- `bot0_thought_graph.thought_generation` — `ThoughtGraphEngine`, horizontal/vertical generation, clustering and ranking, parsing, validation, indexing, in-memory readers
-- `bot0_thought_graph.storage` — `Repository` contract, `JsonRepository`, `MemoryRepository`
-- `bot0_thought_graph.prompts` — public prompt templates
-- `bot0_thought_graph.config` — optional `ProviderConfig` / `Bot0Config` frozen dataclasses (storage is deliberately never implicit)
-
-See [docs/public_api.md](docs/public_api.md), [docs/target_architecture.md](docs/target_architecture.md), [docs/migration_audit.md](docs/migration_audit.md), and [docs/release_readiness_v0.1.0.md](docs/release_readiness_v0.1.0.md).
-
-## Examples
-
-Offline, deterministic, network-free — all run against a fake provider:
+Verify the installation with the repository's test suite:
 
 ```bash
-uv run python examples/thought_generation.py      # concept-first workflow
-uv run python examples/behavior_test.py           # all façade methods end-to-end
+uv run pytest
 ```
 
-`examples/support.py` defines the shared `FakeProvider` and the indexed graph fixture.
+These commands install and run the checkout itself; they do not assume that `xf-thoughtgraph` is available on PyPI. If you are adding the library to another Python project, use that project's dependency workflow with a local path or the repository's Git URL instead of cloning this repository to run its tests.
 
-## Non-goals
+## How It Works
 
-Frontend, FastAPI, WebSocket, voice/audio, TTS, terminal interaction, deployment, authentication, repository-root discovery, implicit provider construction, and automatic persistence are outside this package.
+The engine starts with a concept and chooses one of two generation modes. Both modes use the same tree-shaped output and vertical progression semantics, but they differ in how much control the caller supplies over breadth and depth.
 
-🔥 **Breaking change (v0.1.0)**: the former `VoiceAssist/` prototype was extracted to the separate `voice-assist` repository and the legacy React frontend was removed from the repository. Neither is part of this package or supported as part of `bot0-thought-graph`; future voice work belongs in separate projects such as `voice-tools` and `bot0-voice-assistant`.
+```mermaid
+flowchart TD
+    A[Concept] --> B[Horizontal generation]
+    B --> C{Explicit bounds?}
+    C -->|Yes| D[Retain horizontal children]
+    D --> E[Explicit vertical expansion]
+    C -->|No: adaptive profile| F[Probe candidate batches]
+    F --> G["Deterministic novelty, relevance, and marginal-value filters"]
+    G --> H[Eligible child candidates]
+    H --> I[Batch decomposition evaluation]
+    I -->|Decompose| J[Recursive vertical expansion]
+    I -->|Stop or terminal| K[Retain child]
+    E --> L[ThoughtGraph]
+    J --> L
+    K --> L
+    L --> M[Optional explicit persistence]
+```
 
-Legacy application modules and interview/conversational workflows are outside
-the `bot0_thought_graph` package boundary and have been retired from this
-repository. A separate consuming application/package may own those workflows.
+Horizontal generation asks for distinct major dimensions of the concept at the same abstraction level. It is not intended to mix categories with implementation steps, examples, or fine-grained details. Vertical generation expands one retained thought in the context of its parent and ancestors. The selected `ProgressionType` tells the provider how those children should progress—for example, from simple to complex or through prerequisites and dependencies.
 
-## Development
+Provider calls supply semantic proposals. Python code validates their structured output, removes repeated or unsuitable candidates, enforces budgets, and builds the graph.
+
+## Quick Start
+
+From a local checkout, follow [Local Setup (Clone and Run)](#local-setup-clone-and-run). If you are adding the library to another project, use that project's dependency workflow with the repository URL or a local path; this README does not assume a PyPI publication.
+
+```bash
+uv add "xf-thoughtgraph @ git+https://github.com/xfzhang823/xf-thoughtgraph.git"
+export OPENAI_API_KEY="..."
+```
+
+```python
+from xf_thoughtgraph import ProgressionType, generate_thought_graph
+
+graph = generate_thought_graph(
+    "Design a reliable data ingestion platform",
+    provider="openai",
+    exploration="balanced",
+    progression_type=ProgressionType.PREREQUISITE_DEPENDENCY,
+)
+
+print(graph.concept)
+print(graph.model_dump_json(indent=2))
+```
+
+The convenience function requires a provider name or an injected provider. Named providers use their configured default model unless `model` is supplied. The example makes live provider calls; the repository's examples use fake providers for offline behavior checks.
+
+For direct control, construct the engine and provide explicit horizontal and vertical bounds:
+
+```python
+from xf_thoughtgraph import ThoughtGraphEngine
+
+engine = ThoughtGraphEngine(provider="openai")
+graph = engine.generate_thought_graph(
+    topic="Design a reliable data ingestion platform",
+    horizontal=4,
+    vertical=3,
+)
+```
+
+## Generation Modes
+
+### Adaptive generation
+
+Omit both bounds and select an exploration profile (`"focused"`, `"balanced"`, or `"rich"`). The engine probes horizontal candidates in small batches and retains only meaningful, sufficiently distinct thoughts. It then expands retained nodes as needed.
+
+Profiles change evidence thresholds and filtering strictness; they do not translate into fixed graph sizes. Adaptive generation is bounded by provider-call, node, expansion, candidate, and depth limits. If a limit is reached, the engine returns the valid partial graph produced so far and records the decision in its adaptive trace.
+
+If no mode is specified, the public convenience API uses the `"balanced"` profile. Adaptive and explicit bounds are mutually exclusive: choose a profile or provide `horizontal` and `vertical`, not both.
+
+### Explicit generation
+
+Supply `horizontal` and `vertical` to request a predictable bounded traversal:
+
+```python
+graph = engine.generate_thought_graph(
+    topic="Plan a product launch",
+    horizontal=5,
+    vertical=2,
+    progression_type=ProgressionType.CHRONOLOGICAL,
+)
+```
+
+`horizontal` controls the retained root-level alternatives. `vertical` controls the maximum number of generated child levels beneath the root. A vertical value of `1` therefore returns the root and its horizontal children without expanding those children; the returned metadata still reports the requested value. Explicit mode uses a fixed provider request size for each vertical expansion; it does not infer vertical child count from the horizontal bound.
+
+The returned `ThoughtGraph` includes `depth` and `breadth` metadata describing the requested/output shape. These are output fields, not deprecated generation parameters.
+
+## Evaluation and Continuation
+
+Adaptive continuation has two distinct stages.
+
+First, deterministic filters remove candidates that are repetitive, insufficiently related to the root or ancestor path, unlikely to add marginal value, or recognizable as natural endpoints. These checks use normalized tokens, overlap signals, path context, and profile thresholds. They do not call an LLM.
+
+Second, the active decomposition evaluation agent receives the eligible candidates for a parent as a batch. Its narrow question is whether another vertical decomposition step is worth the next provider call. It is not asked to generate children, rank general quality, replace relevance filtering, or enforce a fixed graph width or depth. The agent returns a decision for each stable candidate identifier, with a reason that is retained in the evaluation result.
+
+The evaluator is therefore not invoked for every thought. Only candidates surviving the deterministic filters reach it. A positive decision permits recursive expansion; a negative decision retains the candidate as a terminal branch. Provider failures or malformed evaluation responses are handled at the adaptive boundary, while safety budgets still prevent unbounded growth.
+
+## Installation and Providers
+
+XF ThoughtGraph supports Python 3.10 and newer. The core package depends on Pydantic for validated models. Provider SDKs are optional:
+
+```bash
+# From a checkout:
+uv sync --extra providers
+# From another project, use the repository URL or a local path as its dependency source.
+```
+
+The `providers` extra installs the bundled OpenAI, Anthropic, Google Gemini, and DeepSeek integrations. Their SDKs are imported lazily, so applications that only use models, injected providers, or test doubles do not need every SDK installed.
+
+The provider boundary is `LLMProvider` for synchronous generation and `AsyncLLMProvider` for asynchronous integrations. The engine's public graph-generation methods are synchronous. Applications may also inject a provider implementation directly rather than selecting a built-in provider by name.
+
+Provider behavior is intentionally not flattened into a single generic adapter. OpenAI and Anthropic use their native SDKs; Gemini and DeepSeek use the shared OpenAI-compatible transport, with DeepSeek-specific thinking controls preserved. Model defaults can be overridden through the provider-specific environment variables or an explicit `model`.
+
+## API Overview
+
+The concept-first API is the main entry point:
+
+```python
+from xf_thoughtgraph import ThoughtGraphEngine
+
+engine = ThoughtGraphEngine(provider="openai", model="your-model")
+
+graph = engine.generate_thought_graph(
+    topic="Build a secure document-processing workflow",
+    exploration="focused",
+)
+```
+
+The engine also exposes focused operations for applications that need intermediate stages:
+
+- `generate_subtopics(concept, ...)` produces horizontal `str` candidates.
+- `expand_subtopic(concept, subtopic, ...)` produces vertical detail for one thought.
+- `generate_array_of_thoughts(concept, ...)` returns a validated `ThoughtArray`.
+- `generate(request)` and `expand(request)` accept the lower-level generation request models used by the package.
+- `expand_all(...)` supports the existing typed idea workflow for callers that need its `IdeaJSONModel` shape.
+
+The top-level `generate_thought_graph(...)` function is a small convenience wrapper for the concept-first engine API. Detailed signatures and model contracts are maintained in [`docs/public_api.md`](docs/public_api.md).
+
+## Output Models and Persistence
+
+Graph output is represented by Pydantic models:
+
+- `Thought` contains a non-empty name and an optional description.
+- `ThoughtNode` extends `Thought` with a list of child nodes.
+- `ThoughtGraph` contains the original concept, the root node, and depth/breadth output metadata.
+- `ThoughtArray` represents a concept and a flat list of validated thoughts.
+
+`ProgressionType` affects the intended order or relationship among vertical children. Its values are `IMPLEMENTATION_STEPS`, `SIMPLE_TO_COMPLEX`, `CHRONOLOGICAL`, `PROBLEM_SOLUTION`, and `PREREQUISITE_DEPENDENCY`. It does not create cross-branch graph edges; relationships are represented by the parent-child tree and the generated text.
+
+Persistence is explicit. `MemoryRepository` stores deep-copied values in process memory, while `JsonRepository` writes Pydantic-compatible values to validated plain filenames using an atomic replacement. The engine does not save automatically: provide a repository and call `save` when persistence is part of the application workflow.
+
+```python
+from xf_thoughtgraph import JsonRepository, ThoughtGraphEngine
+
+repository = JsonRepository("./thoughtgraph-data")
+engine = ThoughtGraphEngine(provider="openai", repository=repository)
+graph = engine.generate_thought_graph(
+    topic="Design a reliable data ingestion platform",
+    horizontal=4,
+    vertical=2,
+)
+engine.save("ingestion-platform", graph)
+```
+
+## Architecture and Design Boundaries
+
+The package is deliberately small and separated by responsibility:
+
+- `thought_generation` owns horizontal generation, vertical expansion, adaptive policy, safety limits, and graph assembly.
+- `reflection` owns the structured continuation-evaluation contract.
+- `providers` owns provider factories, SDK adapters, request translation, and provider errors.
+- `models` owns Pydantic output and request schemas.
+- `storage` owns repository protocols and JSON or in-memory persistence.
+- `prompts` contains the current graph-generation and vertical-progression templates.
+
+LLM output is treated as an external, provider-dependent input. Pydantic validation, candidate filtering, graph construction, and safety accounting remain in application code. The package does not promise deterministic LLM output across providers or models. It also does not implicitly make network calls or persistence calls during package import.
+
+## Development and Documentation
+
+Install development dependencies and run the test suite from a checkout:
 
 ```bash
 uv sync --extra providers --extra dev
-uv run python -m compileall src
-uv run pytest           # testpaths=tests, pythonpath=src
+uv run pytest
+uv run python examples/thought_generation.py
 uv build
 ```
 
-- Tests exercise the canonical graph, reflection, model, provider, storage, and package-boundary surfaces. Generation tests use fake or injected providers and make no network requests.
-- The package root is import-clean: it does not construct provider clients or make network requests. Provider-module import may load a repository `.env` file without overriding existing environment variables.
+Useful references:
+
+- [Public API](docs/public_api.md) — supported entry points and model contracts.
+- [Vertical progression audit](docs/vertical_progression_audit.md) — progression semantics and invariants.
+- [Agent policy boundary](docs/agent_policy_boundary.md) — provider and evaluator boundaries.
+- [Excluded components](docs/excluded_components.md) — intentionally out-of-scope functionality.
+- [Examples](examples/) — provider-injected and behavior-test workflows.
+
+The repository's tests cover graph construction, explicit and adaptive traversal, provider-specific behavior, structured evaluation, persistence, and serialization. Run the full suite after changing prompts, provider adapters, output models, or traversal policies.

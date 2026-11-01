@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from bot0_thought_graph.models import IndexedIdeaJSONModel
-from bot0_thought_graph.providers import GenerationRequest, GenerationResult
+from xf_thoughtgraph.models import IndexedIdeaJSONModel
+from xf_thoughtgraph.providers import GenerationRequest, GenerationResult
 
 
 @dataclass
