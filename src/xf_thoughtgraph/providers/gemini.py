@@ -40,8 +40,6 @@ class GeminiProvider(LLMProvider):
             return parse_chat_completion_response(response, provider_name=self.provider_name, model=request.model)
         except ProviderResponseError:
             raise
-        except ProviderRequestError:
-            raise
         except Exception as exc:
             raise ProviderRequestError("Gemini generation failed") from exc
 
@@ -59,8 +57,6 @@ class AsyncGeminiProvider(AsyncLLMProvider):
             response = await self.client.chat.completions.create(**build_chat_completion_kwargs(request))
             return parse_chat_completion_response(response, provider_name=self.provider_name, model=request.model)
         except ProviderResponseError:
-            raise
-        except ProviderRequestError:
             raise
         except Exception as exc:
             raise ProviderRequestError("Gemini generation failed") from exc

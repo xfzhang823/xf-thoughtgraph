@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from pydantic import ValidationError
+
 from xf_thoughtgraph.models import (
     IdeaClusterJSONModel,
     IdeaJSONModel,
@@ -66,6 +68,6 @@ def select_clusters(
     )
     data: Any = extract_json(result.text)
     try:
-        return IdeaClusterJSONModel(**data)
-    except Exception as exc:
+        return IdeaClusterJSONModel.model_validate(data)
+    except (TypeError, ValidationError) as exc:
         raise ValueError("Invalid cluster response") from exc

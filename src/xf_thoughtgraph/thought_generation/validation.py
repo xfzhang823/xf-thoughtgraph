@@ -19,7 +19,7 @@ def validate_idea(data: Mapping[str, Any] | IdeaJSONModel) -> IdeaJSONModel:
     if isinstance(data, IdeaJSONModel):
         return data
     try:
-        return IdeaJSONModel(**dict(data))
+        return IdeaJSONModel.model_validate(data)
     except (TypeError, ValidationError) as exc:
         raise ValueError("Invalid idea thought graph") from exc
 
@@ -31,7 +31,7 @@ def validate_indexed_idea(
     if isinstance(data, IndexedIdeaJSONModel):
         return data
     try:
-        return IndexedIdeaJSONModel(**dict(data))
+        return IndexedIdeaJSONModel.model_validate(data)
     except (TypeError, ValidationError) as exc:
         raise ValueError("Invalid indexed thought graph") from exc
 
@@ -45,6 +45,6 @@ def parse_thought(response_text: str) -> ThoughtJSONModel:
     """Parse and validate a provider response as a thought expansion."""
     data = extract_json(response_text)
     try:
-        return ThoughtJSONModel(**data)
+        return ThoughtJSONModel.model_validate(data)
     except (TypeError, ValidationError) as exc:
         raise ValueError("Invalid vertical thought response") from exc

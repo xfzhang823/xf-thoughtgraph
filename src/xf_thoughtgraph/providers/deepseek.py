@@ -61,8 +61,6 @@ class DeepSeekProvider(LLMProvider):
             return parse_chat_completion_response(response, provider_name=self.provider_name, model=request.model)
         except ProviderResponseError:
             raise
-        except ProviderRequestError:
-            raise
         except Exception as exc:
             raise ProviderRequestError("DeepSeek generation failed") from exc
 
@@ -92,8 +90,6 @@ class AsyncDeepSeekProvider(AsyncLLMProvider):
             )
             return parse_chat_completion_response(response, provider_name=self.provider_name, model=request.model)
         except ProviderResponseError:
-            raise
-        except ProviderRequestError:
             raise
         except Exception as exc:
             raise ProviderRequestError("DeepSeek generation failed") from exc
