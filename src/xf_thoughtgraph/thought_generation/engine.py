@@ -9,6 +9,7 @@
 from typing import Any
 
 from xf_thoughtgraph.models import (
+    AdaptiveExplorationSummary,
     IdeaJSONModel,
     IndexedIdeaJSONModel,
     ProgressionType,
@@ -18,11 +19,13 @@ from xf_thoughtgraph.models import (
     ThoughtJSONModel,
     ThoughtNode,
 )
+from xf_thoughtgraph.providers import LLMProvider, create_provider, default_model
 from xf_thoughtgraph.prompts import (
+    ADAPTIVE_CONCEPT_DETAIL_GENERATION_PROMPT,
+    ADAPTIVE_CONCEPT_SUBTOPIC_GENERATION_PROMPT,
     CONCEPT_DETAIL_GENERATION_PROMPT,
     CONCEPT_SUBTOPIC_GENERATION_PROMPT,
 )
-from xf_thoughtgraph.providers import LLMProvider, create_provider, default_model
 from xf_thoughtgraph.storage import Repository
 
 from .expansion import expand_idea, expand_vertical
@@ -80,17 +83,14 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
     _DEFAULT_VERTICAL_CHILDREN = 7
     """Internal child cap for new explicit horizontal/vertical graph calls."""
 
-    _ADAPTIVE_VERTICAL_CHILDREN = 4
-    """Smaller internal child request used only by adaptive expansion."""
+    _ADAPTIVE_MAX_VERTICAL_OUTPUT = 16
+    """Safety limit for one adaptive vertical response, not a target."""
 
     MAX_FACADE_DEPTH = 8
     """Maximum number of generated child levels supported by new mode."""
 
     _ADAPTIVE_MAX_HORIZONTAL = 8
     """Internal guard against unbounded retained horizontal directions."""
-
-    _ADAPTIVE_HORIZONTAL_CANDIDATES = 3
-    """Small internal candidate batch used by adaptive horizontal probing."""
 
     _ADAPTIVE_MAX_PROVIDER_CALLS = 64
     """Internal profile-independent provider-call guard."""
@@ -138,6 +138,7 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
         self.model = self._require_text(resolved_model, "model")
         self.last_exploration_trace: list[_ExplorationDecision] = []
         self.last_exploration_profile: str | None = None
+        self.last_exploration_summary: AdaptiveExplorationSummary | None = None
         self._adaptive_provider_calls = 0
         self._adaptive_node_count = 0
         self._adaptive_expansion_attempts = 0
@@ -434,6 +435,25 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
             Exception: Any provider, parsing, clustering, or ranking exception
                 raised by the underlying implementation.
         """
+        return self._generate_array_of_thoughts_result(
+            concept,
+            max_subtopics=max_subtopics,
+            max_tokens=max_tokens,
+            ranked=ranked,
+            model=model,
+            prompt_template=CONCEPT_SUBTOPIC_GENERATION_PROMPT,
+        )
+
+    def _generate_array_of_thoughts_result(
+        self,
+        concept: str,
+        *,
+        max_subtopics: int,
+        max_tokens: int,
+        ranked: bool,
+        model: str | None,
+        prompt_template: str,
+    ) -> ThoughtArray:
         concept = self._require_text(concept, "concept")
         max_subtopics = self._require_positive(max_subtopics, "max_subtopics")
         request = HorizontalGenerationRequest(
@@ -443,7 +463,7 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
             max_tokens=max_tokens,
             num_clusters=max_subtopics if ranked else None,
             top_n=max_subtopics if ranked else None,
-            prompt_template=CONCEPT_SUBTOPIC_GENERATION_PROMPT,
+            prompt_template=prompt_template,
         )
         result = self.generate(request)
         return ThoughtArray(
@@ -464,6 +484,8 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
         progression_type: ProgressionType = ProgressionType.IMPLEMENTATION_STEPS,
         ranked: bool = False,
         model: str | None = None,
+        max_calls: int | None = None,
+        max_nodes: int | None = None,
     ) -> ThoughtGraph:
         """Generate a bounded hierarchical thought graph.
 
@@ -508,6 +530,12 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
                 subtopics.
             model: Optional provider-specific model override. When omitted, the
                 engine's default model is used.
+            max_calls: Optional adaptive provider-call budget, including
+                decomposition-evaluation calls. It may lower but not exceed
+                the internal adaptive ceiling.
+            max_nodes: Optional adaptive retained-node budget, including the
+                root. It may lower but not exceed the internal adaptive
+                ceiling.
 
         Returns:
             A ``ThoughtGraph`` containing the root node, generated hierarchy,
@@ -516,8 +544,10 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
 
         Raises:
             ValueError: If ``topic`` is empty, a bound is not a positive
-                integer, ``vertical`` exceeds ``MAX_FACADE_DEPTH``, or the
-                resolved model identifier is empty.
+                integer, an adaptive budget is invalid or used with explicit
+                graph-shape bounds, ``vertical`` exceeds
+                ``MAX_FACADE_DEPTH``, or the resolved model identifier is
+                empty.
             Exception: Any provider, parsing, clustering, ranking, or validation
                 exception raised during graph generation.
         """
@@ -532,27 +562,38 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
             raise ValueError(
                 "exploration cannot be combined with horizontal/vertical"
             )
+        if shape_bounds_supplied and (max_calls is not None or max_nodes is not None):
+            raise ValueError("max_calls/max_nodes require adaptive exploration")
 
         progression_type = ProgressionType(progression_type)
         if exploration is not None:
+            max_calls = self._validate_adaptive_budget(
+                max_calls, self._ADAPTIVE_MAX_PROVIDER_CALLS, "max_calls"
+            )
+            max_nodes = self._validate_adaptive_budget(
+                max_nodes, self._ADAPTIVE_MAX_NODES, "max_nodes"
+            )
             self.last_exploration_trace = []
             self.last_exploration_profile = exploration
-            self._start_adaptive_run()
+            self._start_adaptive_run(max_calls=max_calls, max_nodes=max_nodes)
             root = self._generate_adaptive_graph(
                 topic,
                 exploration=exploration,
                 model=model,
                 progression_type=progression_type,
             )
+            self.last_exploration_summary = self._adaptive_exploration_summary()
             return ThoughtGraph(
                 concept=topic,
                 root=root,
                 depth=max(1, self._graph_depth(root)),
-                breadth=len(root.children),
+                breadth=max(1, len(root.children)),
+                exploration_summary=self.last_exploration_summary,
             )
 
         self.last_exploration_trace = []
         self.last_exploration_profile = None
+        self.last_exploration_summary = None
         horizontal = self._require_positive(
             horizontal if horizontal is not None else self.DEFAULT_FACADE_BREADTH,
             "horizontal",
@@ -600,6 +641,18 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
         if normalized not in {"focused", "balanced", "rich"}:
             raise ValueError("exploration must be 'focused', 'balanced', or 'rich'")
         return normalized
+
+    @classmethod
+    def _validate_adaptive_budget(
+        cls, value: int | None, ceiling: int, name: str
+    ) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+        if value > ceiling:
+            raise ValueError(f"{name} must be <= {ceiling}")
+        return value
 
     def _expand_graph_node(
         self,
@@ -666,6 +719,7 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
         max_tokens: int,
         model: str | None,
         progression_type: ProgressionType = ProgressionType.IMPLEMENTATION_STEPS,
+        prompt_template: str = CONCEPT_DETAIL_GENERATION_PROMPT,
     ) -> ThoughtJSONModel:
         """Generate the typed vertical-expansion result for one subtopic.
 
@@ -702,7 +756,7 @@ class ThoughtGraphEngine(AdaptiveTraversalMixin):
                 progression_type=progression_type,
                 num_sub_thoughts=max_details,
                 max_tokens=max_tokens,
-                prompt_template=CONCEPT_DETAIL_GENERATION_PROMPT,
+                prompt_template=prompt_template,
             )
         )
 

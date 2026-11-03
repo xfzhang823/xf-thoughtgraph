@@ -67,3 +67,13 @@ def test_provider_package_does_not_construct_or_import_adapters_at_import_time(t
         "assert 'xf_thoughtgraph.providers.deepseek' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=env, check=True)
+
+
+def test_thought_generation_readme_lists_every_module():
+    package = PACKAGE / "thought_generation"
+    text = (package / "README.md").read_text(encoding="utf-8")
+    modules = {
+        path.name for path in package.glob("*.py") if path.name != "__init__.py"
+    }
+    missing = sorted(name for name in modules if name not in text)
+    assert not missing, f"thought_generation README is missing: {missing}"

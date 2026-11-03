@@ -79,6 +79,22 @@ def test_root_function_defaults_to_implementation_steps(monkeypatch):
     }]
 
 
+def test_root_function_forwards_adaptive_budgets(monkeypatch):
+    monkeypatch.setattr(public_api, "ThoughtGraphEngine", _FakeEngine)
+
+    public_api.generate_thought_graph(
+        "systems", provider="openai", max_calls=5, max_nodes=12
+    )
+
+    assert _FakeEngine.instances[-1].calls == [{
+        "topic": "systems",
+        "exploration": "balanced",
+        "progression_type": ProgressionType.IMPLEMENTATION_STEPS,
+        "max_calls": 5,
+        "max_nodes": 12,
+    }]
+
+
 def test_root_function_preserves_engine_result_identity(monkeypatch):
     sentinel = object()
 

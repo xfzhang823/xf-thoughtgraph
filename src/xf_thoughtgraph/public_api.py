@@ -12,6 +12,8 @@ def generate_thought_graph(
     progression_type: ProgressionType = ProgressionType.IMPLEMENTATION_STEPS,
     provider: LLMProvider | str | None = None,
     model: str | None = None,
+    max_calls: int | None = None,
+    max_nodes: int | None = None,
 ) -> ThoughtGraph:
     """Generate a thought graph through the canonical engine.
 
@@ -34,6 +36,9 @@ def generate_thought_graph(
             ``LLMProvider`` instance.
         model: Optional provider-specific model identifier. When omitted, the
             provider's configured default model is used.
+        max_calls: Optional adaptive provider-call budget, including
+            decomposition-evaluation calls.
+        max_nodes: Optional adaptive retained-node budget, including the root.
 
     Returns:
         A generated ``ThoughtGraph`` containing the requested root concept and
@@ -51,11 +56,16 @@ def generate_thought_graph(
         )
 
     engine = ThoughtGraphEngine(provider, model=model)
-    return engine.generate_thought_graph(
-        topic=topic,
-        exploration=exploration,
-        progression_type=progression_type,
-    )
+    arguments = {
+        "topic": topic,
+        "exploration": exploration,
+        "progression_type": progression_type,
+    }
+    if max_calls is not None:
+        arguments["max_calls"] = max_calls
+    if max_nodes is not None:
+        arguments["max_nodes"] = max_nodes
+    return engine.generate_thought_graph(**arguments)
 
 
 __all__ = ["generate_thought_graph"]

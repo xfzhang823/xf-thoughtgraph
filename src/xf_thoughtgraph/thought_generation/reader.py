@@ -1,4 +1,4 @@
-"""In-memory readers for validated thought graphs."""
+"""In-memory readers for validated idea hierarchies."""
 
 from collections.abc import Mapping
 from typing import Any

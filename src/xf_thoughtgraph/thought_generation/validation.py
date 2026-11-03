@@ -1,4 +1,4 @@
-"""Validation and in-memory reading of thought-graph structures."""
+"""Validation and parsing of thought-graph structures."""
 
 from collections.abc import Mapping
 from typing import Any

@@ -84,9 +84,8 @@ Progression Types:
 3. "chronological": If applicable, explain the evolution or historical development of the main thought.
 4. "problem_solution": Introduce problems or challenges related to the main thought, followed by
    their solutions or approaches.
-5. "prerequisite_dependency": Generate strict, directional prerequisites or
-   dependencies. Sub-thought A MUST be satisfied, completed, or understood
-   before Sub-thought B or the main thought can proceed.
+5. "prerequisite_dependency": Generate strict, directional prerequisites or dependencies.
+Sub-thought A MUST be satisfied, completed, or understood before Sub-thought B or the main thought can proceed.
 
 Instructions:
 1. Based on the specified progression type **{progression_type}**, determine the most appropriate
@@ -159,6 +158,62 @@ sibling-level dimensions.
 When the progression type is "prerequisite_dependency", each child must be a
 strict, directional prerequisite or dependency: it must be satisfied, completed,
 or understood before the parent thought can proceed.
+
+Return only valid JSON in this shape:
+{{
+  "idea": "{idea}",
+  "thought": "{thought}",
+  "sub_thoughts": [
+    {{"name": "Direct child detail", "description": "What this child covers."}}
+  ]
+}}
+"""
+
+
+ADAPTIVE_CONCEPT_SUBTOPIC_GENERATION_PROMPT = """
+You are an expert at decomposing a concept into a horizontal set of major subtopics.
+
+For the concept "{idea}", identify the natural set of meaningful, distinct,
+sibling-level dimensions. Choose the number of dimensions from the conceptual
+structure of the idea. Keep all items at a consistent granularity and ensure
+they provide useful coverage without unnecessary expansion.
+
+Do not combine independent dimensions to satisfy an artificial limit. Do not
+invent dimensions that do not contribute meaningful coverage. If no meaningful
+subtopics can be identified, return an empty thoughts list.
+
+Return only valid JSON in this shape:
+{{
+  "idea": "{idea}",
+  "thoughts": [
+    {{"thought": "Major subtopic", "description": "What this dimension covers."}}
+  ]
+}}
+"""
+
+
+ADAPTIVE_CONCEPT_DETAIL_GENERATION_PROMPT = """
+You are an expert at vertically expanding one subtopic within a larger concept.
+
+Concept: "{idea}"
+Parent subtopic: "{thought}"
+Progression type: "{progression_type}"
+
+Identify the natural set of meaningful, distinct direct children for the
+parent subtopic. Choose the number from the parent task's conceptual structure,
+not from an artificial target. Keep children at a consistent granularity,
+remain within the larger concept, and avoid repeating the parent or introducing
+unrelated sibling-level dimensions.
+
+Do not combine independent thoughts to satisfy an artificial limit. Do not
+invent unnecessary thoughts. If no meaningful decomposition exists, return an
+empty sub_thoughts list.
+
+When the progression type is "prerequisite_dependency", every child must be a
+strict, directional prerequisite or dependency: it must be satisfied, completed,
+or understood before the parent thought can proceed. Do not return merely
+related topics, parallel alternatives, consequences, or chronological steps
+unless they are also required prerequisites.
 
 Return only valid JSON in this shape:
 {{

@@ -39,6 +39,18 @@ class ThoughtNode(Thought):
     children: List["ThoughtNode"] = Field(default_factory=list)
 
 
+class AdaptiveExplorationSummary(BaseModel):
+    """Compact accounting and termination details for adaptive generation."""
+
+    actual_calls: int = Field(..., ge=0)
+    actual_nodes: int = Field(..., ge=0)
+    expansion_attempts: int = Field(..., ge=0)
+    completed: bool
+    stop_reason: str = Field(..., min_length=1)
+    max_calls: int = Field(..., ge=1)
+    max_nodes: int = Field(..., ge=1)
+
+
 class ThoughtGraph(BaseModel):
     """A bounded hierarchy rooted at the requested concept."""
 
@@ -46,6 +58,7 @@ class ThoughtGraph(BaseModel):
     root: ThoughtNode
     depth: int = Field(..., ge=1)
     breadth: int = Field(..., ge=1)
+    exploration_summary: Optional[AdaptiveExplorationSummary] = None
 
 
 ThoughtNode.model_rebuild()

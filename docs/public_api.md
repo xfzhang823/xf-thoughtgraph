@@ -118,6 +118,15 @@ When no graph-shape bounds are supplied, `generate_thought_graph()` uses the
 stopping decisions rather than mapping to fixed graph sizes. Adaptive profiles
 cannot be combined with explicit `horizontal=`/`vertical=` arguments.
 
+Adaptive calls also accept optional `max_calls=` and `max_nodes=` budgets.
+`max_calls` includes generation and continuation-evaluation provider calls;
+`max_nodes` includes the root. Budgets may lower but not exceed the engine's
+internal safety ceilings. Adaptive traversal uses a breadth-first frontier so
+later root branches receive opportunities before earlier branches continue
+deeper. The returned `ThoughtGraph.exploration_summary` reports actual calls,
+nodes, expansion attempts, completion status, configured budgets, and the stop
+reason.
+
 Adaptive horizontal exploration probes small bounded candidate batches and
 evaluates distinctness and marginal value locally before requesting further
 coverage. The batch strategy is internal and does not expose a horizontal

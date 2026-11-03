@@ -1,9 +1,18 @@
 """Stateful adaptive graph traversal used by :class:`ThoughtGraphEngine`."""
 
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 
-from xf_thoughtgraph.models import ProgressionType, ThoughtNode
+from xf_thoughtgraph.models import (
+    AdaptiveExplorationSummary,
+    ProgressionType,
+    ThoughtNode,
+)
+from xf_thoughtgraph.prompts import (
+    ADAPTIVE_CONCEPT_DETAIL_GENERATION_PROMPT,
+    ADAPTIVE_CONCEPT_SUBTOPIC_GENERATION_PROMPT,
+)
 
 from .adaptive_policy import (
     graph_depth,
@@ -70,17 +79,23 @@ class AdaptiveTraversalMixin:
         root.children = self._generate_adaptive_horizontal(
             concept, exploration=exploration, model=model
         )
-        for child in root.children:
-            if self._adaptive_safety_stopped:
-                break
-            self._expand_adaptive_node(
-                child,
+        pending = deque(
+            (child, 1, [concept, child.name]) for child in root.children
+        )
+        while pending and not self._adaptive_safety_stopped:
+            node, level, path = pending.popleft()
+            next_children = self._expand_adaptive_node(
+                node,
                 concept,
                 exploration=exploration,
-                level=1,
-                path=[concept, child.name],
+                level=level,
+                path=path,
                 model=model,
                 progression_type=progression_type,
+            )
+            pending.extend(
+                (child, level + 1, [*path, child.name])
+                for child in next_children
             )
         return root
 
@@ -95,12 +110,14 @@ class AdaptiveTraversalMixin:
                 break
             if not self._consume_adaptive_work(level=0):
                 break
-            batch_size = min(
-                self._ADAPTIVE_HORIZONTAL_CANDIDATES,
-                self._ADAPTIVE_MAX_HORIZONTAL - len(selected),
-            )
-            array = self.generate_array_of_thoughts(
-                concept, max_subtopics=batch_size, ranked=False, model=model
+            batch_size = self._ADAPTIVE_MAX_HORIZONTAL - len(selected)
+            array = self._generate_array_of_thoughts_result(
+                concept,
+                max_subtopics=self._ADAPTIVE_MAX_HORIZONTAL,
+                max_tokens=_DEFAULT_MAX_TOKENS,
+                ranked=False,
+                model=model,
+                prompt_template=ADAPTIVE_CONCEPT_SUBTOPIC_GENERATION_PROMPT,
             )
             if not array.thoughts:
                 self._record_horizontal("stop", _ExplorationReason.NO_CANDIDATE)
@@ -128,7 +145,7 @@ class AdaptiveTraversalMixin:
                     batch_saturated = True
                     continue
 
-                if self._adaptive_node_count >= self._ADAPTIVE_MAX_NODES:
+                if self._adaptive_node_count >= self._adaptive_max_nodes:
                     self._record_safety_stop(
                         _ExplorationReason.NODE_BUDGET,
                         level=0,
@@ -161,6 +178,7 @@ class AdaptiveTraversalMixin:
                 break
 
         if len(selected) >= self._ADAPTIVE_MAX_HORIZONTAL:
+            self._adaptive_ceiling_reason = _ExplorationReason.INTERNAL_CANDIDATE_LIMIT
             self._record_horizontal(
                 "stop", _ExplorationReason.INTERNAL_CANDIDATE_LIMIT
             )
@@ -176,38 +194,43 @@ class AdaptiveTraversalMixin:
         path: list[str],
         model: str | None,
         progression_type: ProgressionType,
-    ) -> None:
+    ) -> list[ThoughtNode]:
         if level >= self.MAX_FACADE_DEPTH:
+            self._adaptive_depth_limit_reached = True
             self._record_vertical(
                 "stop", _ExplorationReason.DEPTH_LIMIT, level=level, thought=node.name
             )
-            return
+            return []
         if self._is_natural_endpoint(node.name):
             self._record_vertical(
                 "stop", _ExplorationReason.NATURAL_ENDPOINT,
                 level=level, thought=node.name,
             )
-            return
+            return []
 
         if not self._consume_adaptive_work(level=level, thought=node.name):
-            return
+            return []
 
         result = self._expand_subtopic_result(
             concept,
             node.name,
-            max_details=self._ADAPTIVE_VERTICAL_CHILDREN,
+            max_details=self._ADAPTIVE_MAX_VERTICAL_OUTPUT,
             max_tokens=_DEFAULT_MAX_TOKENS,
             model=model,
             progression_type=progression_type,
+            prompt_template=ADAPTIVE_CONCEPT_DETAIL_GENERATION_PROMPT,
         )
         overlap_limit = self._profile_overlap_limit(exploration)
         children = []
-        for item in result.sub_thoughts or []:
+        generated_children = result.sub_thoughts or []
+        if len(generated_children) > self._ADAPTIVE_MAX_VERTICAL_OUTPUT:
+            self._adaptive_ceiling_reason = _ExplorationReason.INTERNAL_CANDIDATE_LIMIT
+        for item in generated_children[:self._ADAPTIVE_MAX_VERTICAL_OUTPUT]:
             candidate_context = [*path, *(child.name for child in children)]
             if self._is_meaningful_candidate(
                 item.name, candidate_context, overlap_limit=overlap_limit
             ):
-                if self._adaptive_node_count >= self._ADAPTIVE_MAX_NODES:
+                if self._adaptive_node_count >= self._adaptive_max_nodes:
                     self._record_safety_stop(
                         _ExplorationReason.NODE_BUDGET,
                         level=level,
@@ -227,7 +250,7 @@ class AdaptiveTraversalMixin:
             )
             self._record_vertical("stop", reason, level=level, thought=node.name)
             node.children = []
-            return
+            return []
 
         node.children = children
         self._record_vertical(
@@ -274,7 +297,7 @@ class AdaptiveTraversalMixin:
             eligible_candidates.append((f"child-{len(eligible_children)}", child))
 
         if not eligible_children:
-            return
+            return []
 
         decisions = self._evaluate_adaptive_decomposition(
             path=path,
@@ -283,6 +306,7 @@ class AdaptiveTraversalMixin:
             level=level + 1,
             model=model,
         )
+        next_children: list[ThoughtNode] = []
         for candidate_id, child in eligible_candidates:
             if self._adaptive_safety_stopped:
                 break
@@ -292,15 +316,8 @@ class AdaptiveTraversalMixin:
                     level=level + 1, thought=child.name,
                 )
                 continue
-            self._expand_adaptive_node(
-                child,
-                concept,
-                exploration=exploration,
-                level=level + 1,
-                path=[*path, child.name],
-                model=model,
-                progression_type=progression_type,
-            )
+            next_children.append(child)
+        return next_children
 
     def _evaluate_adaptive_decomposition(
         self,
@@ -357,11 +374,44 @@ class AdaptiveTraversalMixin:
             for decision in result.decisions
         }
 
-    def _start_adaptive_run(self) -> None:
+    def _start_adaptive_run(
+        self,
+        *,
+        max_calls: int | None = None,
+        max_nodes: int | None = None,
+    ) -> None:
         self._adaptive_provider_calls = 0
         self._adaptive_node_count = 0
         self._adaptive_expansion_attempts = 0
         self._adaptive_safety_stopped = False
+        self._adaptive_stop_reason: _ExplorationReason | None = None
+        self._adaptive_depth_limit_reached = False
+        self._adaptive_ceiling_reason: _ExplorationReason | None = None
+        self._adaptive_max_provider_calls = (
+            max_calls if max_calls is not None else self._ADAPTIVE_MAX_PROVIDER_CALLS
+        )
+        self._adaptive_max_nodes = (
+            max_nodes if max_nodes is not None else self._ADAPTIVE_MAX_NODES
+        )
+
+    def _adaptive_exploration_summary(self) -> AdaptiveExplorationSummary:
+        if self._adaptive_safety_stopped:
+            reason = self._adaptive_stop_reason.value
+        elif self._adaptive_depth_limit_reached:
+            reason = _ExplorationReason.DEPTH_LIMIT.value
+        elif self._adaptive_ceiling_reason is not None:
+            reason = self._adaptive_ceiling_reason.value
+        else:
+            reason = "semantic_completion"
+        return AdaptiveExplorationSummary(
+            actual_calls=self._adaptive_provider_calls,
+            actual_nodes=self._adaptive_node_count,
+            expansion_attempts=self._adaptive_expansion_attempts,
+            completed=reason == "semantic_completion",
+            stop_reason=reason,
+            max_calls=self._adaptive_max_provider_calls,
+            max_nodes=self._adaptive_max_nodes,
+        )
 
     def _consume_adaptive_work(self, *, level: int, thought: str | None = None) -> bool:
         if not self._consume_adaptive_provider_call(level=level, thought=thought):
@@ -382,7 +432,7 @@ class AdaptiveTraversalMixin:
     ) -> bool:
         if self._adaptive_safety_stopped:
             return False
-        if self._adaptive_provider_calls >= self._ADAPTIVE_MAX_PROVIDER_CALLS:
+        if self._adaptive_provider_calls >= self._adaptive_max_provider_calls:
             self._record_safety_stop(
                 _ExplorationReason.CALL_BUDGET,
                 level=level,
@@ -402,6 +452,7 @@ class AdaptiveTraversalMixin:
         if self._adaptive_safety_stopped:
             return
         self._adaptive_safety_stopped = True
+        self._adaptive_stop_reason = reason
         self._record_exploration_decision(
             axis="global", action="stop", reason=reason,
             level=level, thought=thought,

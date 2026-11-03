@@ -7,6 +7,7 @@ from .indexed_thought_models import (
 )
 from .thought_models import (
     ClusterJSONModel,
+    AdaptiveExplorationSummary,
     IdeaClusterJSONModel,
     IdeaJSONModel,
     SubThoughtJSONModel,
@@ -20,7 +21,7 @@ from .thought_models import (
 )
 
 __all__ = [
-    "ClusterJSONModel", "IdeaClusterJSONModel", "IdeaJSONModel",
+    "AdaptiveExplorationSummary", "ClusterJSONModel", "IdeaClusterJSONModel", "IdeaJSONModel",
     "IndexedIdeaJSONModel", "IndexedSubThoughtJSONModel", "IndexedThoughtJSONModel",
     "SubThoughtJSONModel", "Thought", "ThoughtArray", "ThoughtGraph",
     "ThoughtJSONModel", "ThoughtNode", "ProgressionType", "validate_thought_batch",
