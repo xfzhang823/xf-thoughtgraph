@@ -33,8 +33,7 @@ from xf_thoughtgraph import generate_thought_graph
 graph = generate_thought_graph(
     "Design a reliable data ingestion platform",
     provider="openai",
-    horizontal=2,
-    vertical=1,
+    exploration="balanced",
 )
 print(graph.model_dump_json(indent=2))
 PY

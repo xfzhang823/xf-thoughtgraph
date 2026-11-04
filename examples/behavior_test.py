@@ -189,7 +189,7 @@ def resolve_config(argv: list[str] | None = None) -> RuntimeConfig:
 
 
 def _fake_response_sequence(topic: str, vertical: int, horizontal: int) -> list[str]:
-    horizontal = {
+    horizontal_payload = {
         "idea": topic,
         "thoughts": [
             {
@@ -199,7 +199,7 @@ def _fake_response_sequence(topic: str, vertical: int, horizontal: int) -> list[
             for index in range(horizontal)
         ],
     }
-    vertical = {
+    vertical_payload = {
         "idea": topic,
         "thought": "subtopic-1",
         "sub_thoughts": [
@@ -215,7 +215,7 @@ def _fake_response_sequence(topic: str, vertical: int, horizontal: int) -> list[
     for _ in range(1, vertical):
         vertical_calls += nodes_at_level
         nodes_at_level *= 7
-    return [json.dumps(horizontal)] + [json.dumps(vertical)] * vertical_calls
+    return [json.dumps(horizontal_payload)] + [json.dumps(vertical_payload)] * vertical_calls
 
 
 def build_provider(config: RuntimeConfig):
